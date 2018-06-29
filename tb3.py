@@ -13,70 +13,72 @@ def find_market_pairs():
         pairs.update({coin["Symbol"]: markets})
     return pairs
 
-def find_market_id(coin1, coin2):
 
+def find_market_id(coin1, coin2):
     for item in trade_pairs:
         if item["Label"] == "%s/%s" % (coin1, coin2) or item["Label"] == "%s/%s" % (coin2, coin1):
             return item["Id"]
 
+
+def assemble_order_quotation(coin1, coin2, quantity):
+    orders = requests.get("https://www.cryptopia.co.nz/api/GetMarketOrderGroups/%s/%s" % (find_market_id(coin1, coin2),
+                          max_orders)).json()
+    for markets in orders["Data"]:
+        qtd_orders = 0
+        order_grand_volume = 0
+        order_grand_price = 0
+        if markets["Market"] == "%s_%s" % (coin1, coin2):
+            print "Direction is Sell"
+            while order_grand_volume < quantity and qtd_orders < max_orders:
+                order_grand_volume += markets["Sell"][qtd_orders]["Volume"]
+                order_grand_price += markets["Sell"][qtd_orders]["Total"]
+                qtd_orders += 1
+
+        if markets["Market"] == "%s_%s" % (coin2, coin1):
+            print "Direction is Buy"
+            while order_grand_volume < quantity and qtd_orders < max_orders:
+                order_grand_volume += markets["Buy"][qtd_orders]["Volume"]
+                order_grand_price += markets["Buy"][qtd_orders]["Total"]
+                qtd_orders += 1
+            order_grand_price = (1 / order_grand_price)
+
+    return ([order_grand_volume, order_grand_price, qtd_orders])
+
+
+# Real thing
+
+max_orders = 1
 
 trade_pairs = requests.get("https://www.cryptopia.co.nz/api/GetTradePairs").json()['Data']
 
 coin_pairs = find_market_pairs()
 
 for coin, markets in coin_pairs.iteritems():
-    if coin =="GBX":
+    if coin == "GBX":
         print "Coin %s has %s available markets: (%s)" % (coin, len(markets), ', '.join(markets))
 
         for initial_market in markets:
             for intermediary_market in markets:
                 if initial_market != intermediary_market and initial_market != coin and intermediary_market != coin:
-                    print " .. Simulating %s>%s, %s>%s, %s>%s" % (initial_market, coin, coin, intermediary_market, intermediary_market, initial_market)
+                    print " .. Simulating %s>%s, %s>%s, %s>%s" % (
+                    initial_market, coin, coin, intermediary_market, intermediary_market, initial_market)
 
-                    markets_to_query = "%s-%s-%s" % (
-                    find_market_id(coin, initial_market), find_market_id(coin, intermediary_market),
-                    find_market_id(intermediary_market, initial_market))
-                    orders = requests.get(
-                         "https://www.cryptopia.co.nz/api/GetMarketOrderGroups/%s/1" % markets_to_query).json()
-
-                    for market in orders["Data"]:
-                         print market
-
-                        # Aqui vou comprar, entao valor e SELL
-                         if market["Market"] == "%s_%s" % (coin, initial_market):
-                            step1_order_volume = float(market["Sell"][0]["Volume"])
-                            step1_unit_price = float(market["Sell"][0]["Price"])
-
-                         # Aqui vou vender, valor e BUY
-                         if market["Market"] == "%s_%s" % (coin, intermediary_market):
-                            step2_order_volume = float(market["Buy"][0]["Volume"])
-                            step2_unit_price = float(market["Buy"][0]["Price"])
-
-                         if market["Market"] == "%s_%s" % (intermediary_market, initial_market):
-                            step3_order_volume = float(market["Sell"][0]["Volume"])
-                            step3_unit_price = float(market["Sell"][0]["Price"])
-
-                    step1_limit = min(step1_order_volume, step2_order_volume)
-                    step2_limit = min(step2_order_volume, step3_order_volume)
-                    step3_limit = step3_order_volume
-
-                    step1_total = step1_unit_price * step1_limit
-                    step2_total = step2_unit_price * step2_limit
-                    step3_total = step3_unit_price * step3_limit
+                    a = assemble_order_quotation(initial_market, coin, 1000)
+                    print "Step 1 .. %s %s > %s %s" % (a[0], initial_market, a[1], coin)
 
 
 
-                    #print "Order size %0.10f (%0.10f - %0.10f)" % (order_size_1, step1_order_volume, step2_order_volume)
+                    b = assemble_order_quotation(coin, intermediary_market, 1000)
+                    print "Step 2 .. %s %s > %s %s" % (b[0], coin, b[1], intermediary_market)
+                    c = assemble_order_quotation(intermediary_market, initial_market, 1000)
+                    print "Step 3 .. %s %s > %s %s" % (c[0], intermediary_market, c[1], initial_market)
 
-                                        #
-                    # order_size_2 = min(order_size_1, step2_order_volume, step3_order_volume)
-                    # step2_total = step2_value * order_size_2
-                    #
-                    # order_size_3 = min(step3_order_volume, step2_order_volume, step3_order_volume)
-                    # step3_total = step3_value * order_size_3
-                    #
-                    print "Step 1 - %0.10f %s > %0.10f %s" % (step1_total, initial_market, step1_order_volume, coin)
-                    print "Step 2 - %0.10f %s > %0.10f %s" % (step2_limit, coin, step2_total, intermediary_market)
-                    print "Step 3 - %0.10f %s > %0.10f %s" % (step3_total, intermediary_market, step3_order_volume, initial_market)
+
+                    cap_step1 = min(a[1], b[0])
+                    cap_step2 = min(b[1], c[0])
+
+                    print "Capped Step 1 .. %s %s > %s %s" % (cap_step1, initial_market, a[1]/a[0] * cap_step1, coin)
+                    print "Capped Step 2 .. %s %s > %s %s" % (cap_step2, coin, b[1], intermediary_market)
+                    print "Capped Step 3 .. %s %s > %s %s" % (c[0], intermediary_market, c[1], initial_market)
 
 

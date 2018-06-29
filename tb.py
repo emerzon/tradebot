@@ -72,7 +72,8 @@ while True:
             selling_value = (order_size * coin_ltc_buy[coin]) * 0.998
             gain = selling_value * ltc_value - buying_cost * btc_value
 
-            if buying_cost >= 0.0005:
+            if True:
+            #if buying_cost >= 0.0005:
                 print
                 print "-------- [%s] -------" % coin
                 print "Considering BTC>LTC: (%0.8f)>(%0.8f) " % (btc_sell_order_size, ltc_buy_order_size)

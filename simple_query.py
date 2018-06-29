@@ -7,5 +7,6 @@ coin = "GBX"
 
 temp = requests.get("https://www.cryptopia.co.nz/api/GetMarketOrderGroups/%s_BTC-%s_LTC/1" % (coin, coin)).json()
 
+print temp
 print float(temp['Data'][0]['Sell'][0]['Price']) * btc_value
 print float(temp['Data'][1]['Sell'][0]['Price']) * ltc_value
