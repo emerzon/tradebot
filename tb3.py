@@ -73,21 +73,25 @@ for coin, markets in coin_pairs.iteritems():
 
                     a = assemble_order_quotation(initial_market, coin, 1000)
                     print "Step 1 .. %s %s > %s %s" % (a[1], initial_market, a[0], coin)
+                    limit = a[1]
+
+                    print "Limit is now %0.10f %s" % (limit, initial_market)
+
                     b = assemble_order_quotation(coin, intermediary_market, 1000)
                     print "Step 2 .. %s %s > %s %s" % (b[0], coin, b[1], intermediary_market)
+
+                    limit = min(limit, b[1] * (a[1]/a[0]))
+
+                    print "Limit is now %0.10f %s" % (limit, initial_market)
+
                     c = assemble_order_quotation(intermediary_market, initial_market, 1000)
-                    print "Step 3 .. %s %s > %s %s" % (c[0], intermediary_market, c[1], initial_market)
+                    print "Step 3 .. %s %s > %s %s" % (c[1], intermediary_market, c[0], initial_market)
 
-                    rate_1 = a[0] / a[1]
-                    rate_2 = b[1] / b[0]
-                    rate_3 = c[1] / c[0]
-
-                    limit_2 = min(b[1], c[0])
-                    limit_1 = min(a[1], (min(b[1], c[0])))
+                    limit = min(limit, c[0] * b[1] * (a[1]/a[0]))
+                    print "Limit is now %0.10f %s" % (limit, initial_market)
 
 
 
-
-                    print "Capped Step 1 .. %0.8f %s > %0.8f %s" % (limit_1, initial_market,limit_2, coin)
-                    print "Capped Step 2 .. %0.8f %s > %0.8f %s" % (limit_2, coin, c[0], intermediary_market)
-                    print "       Step 3 .. %0.8f %s > %0.8f %s" % (c[0], intermediary_market, c[1], initial_market)
+                    print "Capped Step 1 .. %0.8f %s > %0.8f %s" % (limit, initial_market, a[1]/a[0], coin)
+                    print "Capped Step 2 .. %0.8f %s > %0.8f %s" % (a[1]/a[0], coin, b[1]* (a[1]/a[0]), intermediary_market)
+                    print "       Step 3 .. %0.8f %s > %0.8f %s" % (c[0] / b[1] * (a[1]/a[0]), intermediary_market, c[0] * b[1] * (a[1]/a[0]), initial_market)
