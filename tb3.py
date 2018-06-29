@@ -27,20 +27,18 @@ def assemble_order_quotation(coin1, coin2, quantity):
         qtd_orders = 0
         order_grand_volume = 0
         order_grand_price = 0
-        if markets["Market"] == "%s_%s" % (coin1, coin2):
-            #print "Direction is Sell"
-            while order_grand_volume < quantity and qtd_orders < max_orders:
-                order_grand_volume += markets["Sell"][qtd_orders]["Volume"]
-                order_grand_price += markets["Sell"][qtd_orders]["Total"]
-                qtd_orders += 1
+        direction = ""
 
-        if markets["Market"] == "%s_%s" % (coin2, coin1):
-            #print "Direction is Buy"
+        if markets["Market"] == "%s_%s" % (coin1, coin2):
+            direction = "Sell"
+        elif markets["Market"] == "%s_%s" % (coin2, coin1):
+            direction = "Buy"
+
+        if direction != "":
             while order_grand_volume < quantity and qtd_orders < max_orders:
-                order_grand_volume += markets["Buy"][qtd_orders]["Volume"]
-                order_grand_price += markets["Buy"][qtd_orders]["Total"]
+                order_grand_volume += markets[direction][qtd_orders]["Volume"]
+                order_grand_price += markets[direction][qtd_orders]["Total"]
                 qtd_orders += 1
-            order_grand_price = (order_grand_price)
 
     return ([order_grand_volume, order_grand_price, qtd_orders])
 
@@ -73,25 +71,29 @@ for coin, markets in coin_pairs.iteritems():
 
                     a = assemble_order_quotation(initial_market, coin, 1000)
                     print "Step 1 .. %s %s > %s %s" % (a[1], initial_market, a[0], coin)
-                    limit = a[1]
 
-                    print "Limit is now %0.10f %s" % (limit, initial_market)
 
                     b = assemble_order_quotation(coin, intermediary_market, 1000)
                     print "Step 2 .. %s %s > %s %s" % (b[0], coin, b[1], intermediary_market)
 
-                    limit = min(limit, b[1] * (a[1]/a[0]))
-
-                    print "Limit is now %0.10f %s" % (limit, initial_market)
-
                     c = assemble_order_quotation(intermediary_market, initial_market, 1000)
-                    print "Step 3 .. %s %s > %s %s" % (c[1], intermediary_market, c[0], initial_market)
+                    print "Step 3 .. %s %s > %s %s" % (c[0], intermediary_market, c[1], initial_market)
 
-                    limit = min(limit, c[0] * b[1] * (a[1]/a[0]))
-                    print "Limit is now %0.10f %s" % (limit, initial_market)
+                    rate_for_order_1 = a[1]
+                    rate_for_order_2 = (b[1]/b[0]) * rate_for_order_1
+                    rate_for_order_3 = 1/(c[1]/c[0]) * rate_for_order_2
 
 
 
-                    print "Capped Step 1 .. %0.8f %s > %0.8f %s" % (limit, initial_market, a[1]/a[0], coin)
-                    print "Capped Step 2 .. %0.8f %s > %0.8f %s" % (a[1]/a[0], coin, b[1]* (a[1]/a[0]), intermediary_market)
-                    print "       Step 3 .. %0.8f %s > %0.8f %s" % (c[0] / b[1] * (a[1]/a[0]), intermediary_market, c[0] * b[1] * (a[1]/a[0]), initial_market)
+                    print "Rates: %0.8f %0.8f %0.8f" % (rate_for_order_1, rate_for_order_2, rate_for_order_3)
+
+
+                    limit_for_order_1 = a[1]
+                    limit_for_order_2 = b[0] * (a[0] / a[1]) * 0.998
+                    limit_for_order_3 = c[0] * (a[0] / a[1]) * 0.998
+
+                    limit_for_order = min(limit_for_order_1, limit_for_order_2, limit_for_order_3)
+
+                    print "Capped Step 1 .. %0.8f %s > %0.8f %s" % (limit_for_order, initial_market, limit_for_order * rate_for_order_1, coin)
+                    print "Capped Step 2 .. %0.8f %s > %0.8f %s" % (limit_for_order * rate_for_order_1, coin, limit_for_order * rate_for_order_2, intermediary_market)
+                    print "       Step 3 .. %0.8f %s > %0.8f %s" % (limit_for_order * rate_for_order_2,  initial_market, limit_for_order * rate_for_order_3, initial_market)
