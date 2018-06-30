@@ -35,7 +35,7 @@ def assemble_order_quotation(coin1, coin2, quantity):
             direction = "Buy"
 
         if direction != "":
-            while order_grand_volume < quantity and qtd_orders < max_orders:
+            while order_grand_price < quantity and qtd_orders < max_orders:
                 order_grand_volume += markets[direction][qtd_orders]["Volume"]
                 order_grand_price += markets[direction][qtd_orders]["Total"]
                 qtd_orders += 1
@@ -45,7 +45,7 @@ def assemble_order_quotation(coin1, coin2, quantity):
 
 # Real thing
 
-max_orders = 20
+max_orders = 40
 balances = {'BTC': 1000,
            'LTC': 1000,
            'DOGE': 1000,
@@ -85,9 +85,22 @@ for coin, markets in coin_pairs.iteritems():
                     c = assemble_order_quotation(intermediary_market, initial_market, b[1])
                     print "Eval 3 .. %s %s > %s %s" % (c[0], intermediary_market, c[1], initial_market)
 
+                    xr_initial_coin = a[0] / a[1]
+                    xr_coin_initial = a[1] / a[0]
+
+                    xr_coin_intermediary = b[1] / b[0]
+                    xr_intermediary_coin = b[0] / b[1]
+                    xr_intermediary_initial = (1/xr_initial_coin) * xr_intermediary_coin
+
+                    print "Found exchange rate %s/%s: %0.10f" % (initial_market, coin, xr_initial_coin)
+                    print "Found exchange rate %s/%s: %0.10f" % (coin, initial_market, xr_coin_initial)
+                    print "Found exchange rate %s/%s: %0.10f" % (coin, intermediary_market, xr_coin_intermediary)
+                    print "Found exchange rate %s/%s: %0.10f" % (intermediary_market, coin, xr_intermediary_coin)
+                    print "Found exchange rate %s/%s: %0.10f" % (intermediary_market, initial_market, xr_intermediary_initial)
+
                     max_for_order_1 = a[1]
-                    max_for_order_2 = (b[1]*b[0]) * max_for_order_1 / a[0]
-                    max_for_order_3 = (c[1]*c[0]) * max_for_order_2
+                    max_for_order_2 = (b[1]*b[0]) * xr_initial_for_order_2
+                    max_for_order_3 = (c[1]*c[0]) / max_for_order_2
 
                     print "Max Orders (%s): %0.8f %0.8f %0.8f" % (initial_market, max_for_order_1, max_for_order_2, max_for_order_3)
 
@@ -101,9 +114,9 @@ for coin, markets in coin_pairs.iteritems():
 
 
                     amount_1 = limit_for_order
-                    amount_2 = 1/(limit_for_order * max_for_order_1)
-                    amount_3 = limit_for_order * amount_2
-                    amount_4 = limit_for_order * amount_3
+                    amount_2 = limit_for_order / max_for_order_2
+                    amount_3 = limit_for_order / max_for_order_3
+                    amount_4 = limit_for_order / (1/amount_3)
 
                     print "Step 1 .. %0.10f %s > %0.10f %s" % (amount_1, initial_market, amount_2, coin)
                     print "Step 2 .. %0.10f %s > %0.10f %s" % (amount_2, coin, amount_3, intermediary_market)
