@@ -19,11 +19,12 @@ def find_market_pairs():
 def find_market_id(coin1, coin2):
     for item in trade_pairs:
         if item["Label"] == "%s/%s" % (coin1, coin2) or item["Label"] == "%s/%s" % (coin2, coin1):
-            return item["Id"]
+            return item["Id"], item["MinimumTrade"]
 
 
 def assemble_order_quotation(coin1, coin2, quantity):
-    orders = requests.get("https://www.cryptopia.co.nz/api/GetMarketOrderGroups/%s/%s" % (find_market_id(coin1, coin2),
+    market_info = find_market_id(coin1, coin2)
+    orders = requests.get("https://www.cryptopia.co.nz/api/GetMarketOrderGroups/%s/%s" % (market_info[0],
                           max_orders)).json()
     for market in orders["Data"]:
         qtd_orders = 0
@@ -36,17 +37,53 @@ def assemble_order_quotation(coin1, coin2, quantity):
         elif market["Market"] == "%s_%s" % (coin1, coin2):
             direction = "Buy"
 
-
-
         if direction != "":
-            #print direction
-            #print market
-            while order_grand_price < quantity and qtd_orders < max_orders and qtd_orders < len(market):
+            while order_grand_price < quantity and qtd_orders < max_orders and qtd_orders < len(market[direction]):
                 order_grand_volume += market[direction][qtd_orders]["Volume"]
                 order_grand_price += market[direction][qtd_orders]["Total"]
+
+                #if order_grand_price > quantity:
+
+
+                   #print "Requested size %0.12f - Total size %0.12f" % (quantity, order_grand_price)
+                   #exceed = order_grand_price - quantity
+                   #print "Exceeded %0.12f" % exceed
+
+                   #print "Minimum trade is: %s" % market_info[1]
+                   #if exceed > market_info[1]:
+                       #print "Last order decrease is possible!"
+
+                       # print "Last order total: %s" % market[direction][qtd_orders]["Total"]
+                       # print "Last order volume: %s" % market[direction][qtd_orders]["Volume"]
+                       #
+                       # last_order_rate = (float(market[direction][qtd_orders]["Volume"]) / float(
+                       #     market[direction][qtd_orders]["Total"]))
+                       # print "Last order rate: %s" % last_order_rate
+                       #
+                       # new_order_volume = min(market_info[1],
+                       #                        last_order_rate / (market[direction][qtd_orders]["Volume"] - exceed))
+                       #
+                       #
+                       # new_order_total = (market[direction][qtd_orders]["Total"] - exceed)
+                       # print "New last order volume: %s" % new_order_volume
+                       # print "New last order total: %s" % new_order_total
+                       #
+                       # order_grand_price -= market[direction][qtd_orders]["Total"]
+                       # order_grand_price += (new_order_total)
+                       # order_grand_volume -= market[direction][qtd_orders]["Volume"]
+                       # order_grand_volume += (new_order_total * last_order_rate)
+                       #
+                       # print "Order now is %0.12f" % order_grand_price
+                   #else:
+                       # print "Last order decrease not possible"
+
                 qtd_orders += 1
 
+            if direction == "Buy":
+                order_grand_price *= 1.002
 
+            if direction == "Sell":
+                order_grand_price *= 0.998
 
     return ([order_grand_volume, order_grand_price, qtd_orders])
 
@@ -72,6 +109,7 @@ fiat = {'BTC': float(requests.get("https://api.coinbase.com/v2/prices/BTC-USD/se
 # ----------------------------------------------------------------------------------------------------------------------
 
 trade_pairs = requests.get("https://www.cryptopia.co.nz/api/GetTradePairs").json()['Data']
+#print trade_pairs
 
 coin_pairs = find_market_pairs()
 
@@ -82,7 +120,7 @@ for coin, markets in coin_pairs.iteritems():
 
         for initial_market in markets:
             for intermediary_market in markets:
-                if initial_market != intermediary_market and initial_market != coin and intermediary_market != coin and initial_market not in ['USDT', 'NZDT']:
+                if initial_market != intermediary_market and initial_market != coin and intermediary_market != coin and initial_market not in ['USDT', 'NZDT', 'DOGE'] and intermediary_market not in ['USDT', 'NZDT', 'DOGE']:
                     print " .. Simulating %s>%s, %s>%s, %s>%s" % (
                     initial_market, coin, coin, intermediary_market, intermediary_market, initial_market)
 
@@ -131,15 +169,15 @@ for coin, markets in coin_pairs.iteritems():
                     profit = float(result - amount_1)
 
                     #if True:
-                    if profit > 0:
-                        winsound.Beep(2500, 1000)
+                    if profit > 0.000001:
+                        winsound.Beep(5500, 100)
                         print "*************************************************************************** Profit %0.12f %s" % (profit, initial_market),
                         if initial_market in fiat.iterkeys():
                             print "( US$ %0.2f )" % (float(fiat[initial_market]) * float(profit))
                         else:
                             print ""
                     else:
-                        print "Lose %0.12f %s" % (
+                        print "Loss %0.12f %s" % (
                         profit, initial_market),
                         if initial_market in fiat.iterkeys():
                             print "( US$ %0.2f )" % (float(fiat[initial_market]) * float(profit))
