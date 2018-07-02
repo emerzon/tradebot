@@ -1,10 +1,10 @@
 import requests
-import winsound
-
-
-
+#import winsound
 
 def find_market_pairs():
+    if 'trade_pairs' not in globals():
+        global trade_pairs
+        trade_pairs = requests.get("https://www.cryptopia.co.nz/api/GetTradePairs").json()['Data']
     pairs = {}
     for coin in trade_pairs:
         markets = []
@@ -23,8 +23,9 @@ def find_market_id(coin1, coin2):
 
 
 def assemble_order_quotation(coin1, coin2, quantity):
-    market_info = find_market_id(coin1, coin2)
-    orders = requests.get("https://www.cryptopia.co.nz/api/GetMarketOrderGroups/%s/%s" % (market_info[0],
+
+    market_id, market_min_trade = find_market_id(coin1, coin2)
+    orders = requests.get("https://www.cryptopia.co.nz/api/GetMarketOrderGroups/%s/%s" % (market_id,
                           max_orders)).json()
     for market in orders["Data"]:
         qtd_orders = 0
@@ -38,7 +39,10 @@ def assemble_order_quotation(coin1, coin2, quantity):
             direction = "Buy"
 
         if direction != "":
-            while order_grand_price < quantity and qtd_orders < max_orders and qtd_orders < len(market[direction]):
+            while ((order_grand_price < quantity and direction == "Sell") or
+                   (order_grand_volume < quantity and direction == "Buy")) and \
+                    qtd_orders < max_orders and \
+                    qtd_orders < len(market[direction]):
                 order_grand_volume += market[direction][qtd_orders]["Volume"]
                 order_grand_price += market[direction][qtd_orders]["Total"]
 
@@ -49,8 +53,8 @@ def assemble_order_quotation(coin1, coin2, quantity):
                    #exceed = order_grand_price - quantity
                    #print "Exceeded %0.12f" % exceed
 
-                   #print "Minimum trade is: %s" % market_info[1]
-                   #if exceed > market_info[1]:
+                   #print "Minimum trade is: %s" % market_min_trade
+                   #if exceed > market_min_trade:
                        #print "Last order decrease is possible!"
 
                        # print "Last order total: %s" % market[direction][qtd_orders]["Total"]
@@ -60,7 +64,7 @@ def assemble_order_quotation(coin1, coin2, quantity):
                        #     market[direction][qtd_orders]["Total"]))
                        # print "Last order rate: %s" % last_order_rate
                        #
-                       # new_order_volume = min(market_info[1],
+                       # new_order_volume = min(market_min_trade,
                        #                        last_order_rate / (market[direction][qtd_orders]["Volume"] - exceed))
                        #
                        #
@@ -90,7 +94,7 @@ def assemble_order_quotation(coin1, coin2, quantity):
 
 # Real thing
 
-max_orders = 1
+max_orders = 10
 balances = {'BTC': 1000,
            'LTC': 1000,
            'DOGE': 1000,
@@ -108,9 +112,6 @@ fiat = {'BTC': float(requests.get("https://api.coinbase.com/v2/prices/BTC-USD/se
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-trade_pairs = requests.get("https://www.cryptopia.co.nz/api/GetTradePairs").json()['Data']
-#print trade_pairs
-
 coin_pairs = find_market_pairs()
 
 for coin, markets in coin_pairs.iteritems():
@@ -125,13 +126,13 @@ for coin, markets in coin_pairs.iteritems():
                     initial_market, coin, coin, intermediary_market, intermediary_market, initial_market)
 
                     a = assemble_order_quotation(initial_market, coin, minimum_order[initial_market])
-                    print "Eval 1 .. %0.12f %s > %0.12f %s" % (a[1], initial_market, a[0], coin)
+                    print "Eval 1 .. %0.12f %s > %0.12f %s [%s]" % (a[1], initial_market, a[0], coin, a[2])
 
                     b = assemble_order_quotation(coin, intermediary_market, a[0])
-                    print "Eval 2 .. %0.12f %s > %0.12f %s" % (b[0], coin, b[1], intermediary_market)
+                    print "Eval 2 .. %0.12f %s > %0.12f %s [%s]" % (b[0], coin, b[1], intermediary_market, b[2])
 
                     c = assemble_order_quotation(intermediary_market, initial_market, b[1])
-                    print "Eval 3 .. %0.12f %s > %0.12f %s" % (c[0], intermediary_market, c[1], initial_market)
+                    print "Eval 3 .. %0.12f %s > %0.12f %s [%s]" % (c[0], intermediary_market, c[1], initial_market, c[2])
 
                     xr_initial_coin = a[0] / a[1]
                     xr_coin_initial = a[1] / a[0]
