@@ -184,7 +184,11 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                     if direction == "Sell":
                         missing_price = Decimal(quantity) - Decimal(suborder_price)
                         if missing_price < market_MinimumBaseTrade:
-                            missing_price = market_MinimumBaseTrade
+                            logger.debug("ORDER TOO SMALL!")
+                            logger.debug("Current multiplier is %s" % failure_multiplier)
+                            failure_multiplier += market_MinimumBaseTrade / missing_price
+                            logger.debug("Increased multiplier is %s" % failure_multiplier)
+                            raise ValueError('OrderTooSmall')
                         order_filling_ratio = missing_price / current_price
                     else:
                         missing_volume = quantity - suborder_volume
@@ -225,6 +229,8 @@ s = requests.Session()
 coin_pairs = find_market_pairs()
 max_orders = 50
 
+allowed_initial_markets = ["BTC", "LTC", "DOGE"]
+
 while True:
     for coin, markets in coin_pairs.iteritems():
         logging.info("Coin %s has %s available markets: (%s)" % (coin, len(markets), ", ".join(markets)))
@@ -234,7 +240,7 @@ while True:
                 if initial_market != intermediary_market and \
                         initial_market != coin and \
                         intermediary_market != coin and\
-                        initial_market == "LTC":
+                        initial_market in allowed_initial_markets:
                     logging.info(" .. Simulating %s>%s, %s>%s, %s>%s" % (
                         initial_market, coin, coin, intermediary_market, intermediary_market, initial_market))
 
@@ -265,9 +271,14 @@ while True:
 
                         profit = trade_end_value - trade_initial_value
                         #if True:
+                        logger.info("-- Profit %s" % profit)
                         if profit > 0:
+                            winsound.Beep(4000, 2000)
                             print "%s -> %s %s" % (trade_initial_value, trade_end_value, initial_market)
                             print tabulate(trade, floatfmt=".20f")
+
+                            if len(trade) == 3:
+                                print "+++++++++++ AUTO PROCEED"
 
                     except OverflowError:
                         logging.info("Market is empty!")
