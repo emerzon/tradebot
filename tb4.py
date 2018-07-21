@@ -17,7 +17,7 @@ logging.basicConfig(
         logging.FileHandler("{0}/{1}.log".format(".", "tb4.log")) #,
         #logging.StreamHandler()
     ],
-    level=logging.INFO)
+    level=logging.DEBUG)
 
 logger = logging.getLogger(__name__)
 
@@ -151,10 +151,11 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                 price_trade_fee = 1
                 volume_trade_fee = 1 - (market_TradeFee / 100)
 
+            eof = False
             while ((suborder_price < quantity and direction == "Sell") or
                    (suborder_volume < quantity and direction == "Buy")) and \
                     len(resulting_suborders) < max_orders and \
-                    len(resulting_suborders) < len(market[direction]):
+                    len(resulting_suborders) < len(market[direction]) and not eof:
 
                 logger.debug(
                     "[. {5} .] Current suborder [{0:.20g}]: Total Price: {1:.20g} -  Total Volume: {2:.20g} - Total Requested: {3:.20g} {4}".format(
@@ -199,10 +200,10 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                                       len(
                                           resulting_suborders)][
                                       "Price"])))
+                    eof = True
 
                 resulting_suborders.append(
-                    [market_id, direction, current_price * order_filling_ratio, current_volume * order_filling_ratio, actual_coin1, actual_coin2])
-
+                    [market_id, direction, current_price * order_filling_ratio, current_volume * order_filling_ratio, actual_coin1, actual_coin2,  Decimal(market[direction][len(resulting_suborders)]["Price"])])
                 suborder_price += current_price * order_filling_ratio
                 suborder_volume += current_volume * order_filling_ratio
 
@@ -263,9 +264,10 @@ while True:
                                     trade_end_value += line[3]
 
                         profit = trade_end_value - trade_initial_value
+                        #if True:
                         if profit > 0:
                             print "%s -> %s %s" % (trade_initial_value, trade_end_value, initial_market)
-                            print tabulate(trade)
+                            print tabulate(trade, floatfmt=".20f")
 
                     except OverflowError:
                         logging.info("Market is empty!")
