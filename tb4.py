@@ -1,4 +1,5 @@
 import requests
+from tabulate import tabulate
 import winsound
 import pprint
 
@@ -14,7 +15,7 @@ logging.basicConfig(
         logging.FileHandler("{0}/{1}.log".format(".", "tb4.log")) #,
         #logging.StreamHandler()
     ],
-    level=logging.DEBUG)
+    level=logging.INFO)
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ def assemble_order_quotation(initial_quantity, *pairs):
     for coin1, coin2 in pairs:
         market_ids.append(find_market_id(coin1, coin2)[0])
 
-    logger.debug("-----------------------------------------------------------------------] Beggining order assembly...")
+    logger.debug("[..] Beggining order assembly...")
     logger.debug(
         "[..] Querying total of %s markets: (%s) [Max Orders: %s]" % (
             len(market_ids), ", ".join(str(x) for x in market_ids), max_orders))
@@ -66,14 +67,13 @@ def assemble_order_quotation(initial_quantity, *pairs):
 
     while True:
         quantity = initial_quantity
-        logger.debug(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> BEGIN OF ORDER")
         try:
             resulting_orders = []
             for coin1, coin2 in pairs:
                 if len(resulting_orders) == 0:
                     actual_quantity = Decimal(quantity) * Decimal(failure_multiplier)
                 else:
-                    actual_quantity = quantity
+                    actual_quantity = Decimal(quantity)
                 suborder = assemble_suborder(coin1, coin2, actual_quantity, orders)
                 suborder_price = sum(Decimal(row[2]) for row in suborder)
                 suborder_volume = sum(Decimal(row[3]) for row in suborder)
@@ -99,9 +99,7 @@ def assemble_order_quotation(initial_quantity, *pairs):
             continue
         break
 
-
-    return ({"Profit": Decimal(quantity) - Decimal(initial_quantity),
-             "Orders": resulting_orders})
+    return (resulting_orders)
 
 
 def assemble_suborder(coin1, coin2, quantity, orders):
@@ -127,10 +125,10 @@ def assemble_suborder(coin1, coin2, quantity, orders):
             if reversed_market:
                 direction = "Sell"
                 if quantity < market_MinimumBaseTrade:
-                    logger.error("ORDER TOO SMALL!")
-                    logger.error("Current multiplier is %s" % failure_multiplier)
+                    logger.debug("ORDER TOO SMALL!")
+                    logger.debug("Current multiplier is %s" % failure_multiplier)
                     failure_multiplier += market_MinimumBaseTrade/quantity
-                    logger.error("Increased multiplier is %s" % failure_multiplier)
+                    logger.debug("Increased multiplier is %s" % failure_multiplier)
                     raise ValueError('OrderTooSmall')
 
                 volume_trade_fee = 1
@@ -172,16 +170,16 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                     order_filling_ratio = 1
                 else:
                     if direction == "Sell":
+                        actual_coin1 = coin1
+                        actual_coin2 = coin2
                         missing_price = Decimal(quantity) - Decimal(suborder_price)
                         if missing_price < market_MinimumBaseTrade:
                             missing_price = market_MinimumBaseTrade
-
                         order_filling_ratio = missing_price / current_price
                     else:
+                        actual_coin1 = coin2
+                        actual_coin2 = coin1
                         missing_volume = quantity - suborder_volume
-                        # if missing_volume <  (market_MinimumBaseTrade:
-                        #    missing_volume = 1 / market_MinimumBaseTrade
-
                         order_filling_ratio = missing_volume / current_volume
 
                     logger.debug(
@@ -196,7 +194,7 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                                       "Price"])))
 
                 resulting_suborders.append(
-                    [market_id, direction, current_price * order_filling_ratio, current_volume * order_filling_ratio])
+                    [market_id, direction, current_price * order_filling_ratio, current_volume * order_filling_ratio, actual_coin1, actual_coin2])
 
                 suborder_price += current_price * order_filling_ratio
                 suborder_volume += current_volume * order_filling_ratio
@@ -208,11 +206,11 @@ def find_common_minimum(*coins):
     return True
 
 
-minimum_order = {"BTC": 0.0005,
-                 "LTC": 0.01,
-                 "DOGE": 10000,
-                 "USDT": 1,
-                 "NZDT": 1}
+minimum_order = {"BTC": Decimal(0.0005),
+                 "LTC": Decimal(0.01),
+                 "DOGE": Decimal(100),
+                 "USDT": Decimal(1),
+                 "NZDT": Decimal(1)}
 
 global s
 s = requests.Session()
@@ -234,5 +232,6 @@ while True:
                     trade = assemble_order_quotation(minimum_order[initial_market], [initial_market, coin],
                                                      [coin, intermediary_market], [intermediary_market, initial_market])
 
-                    if trade["Profit"] > 0:
-                        print trade
+
+                    print tabulate(trade)
+
