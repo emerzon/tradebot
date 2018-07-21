@@ -1,5 +1,5 @@
 import requests
-# import winsound
+import winsound
 
 import logging
 
@@ -24,11 +24,17 @@ def find_market_pairs():
 def find_market_id(coin1, coin2):
     for item in trade_pairs:
         if item["Label"] == "%s/%s" % (coin1, coin2) or item["Label"] == "%s/%s" % (coin2, coin1):
-            return item["Id"], item["MinimumTrade"]
+            return item["Id"]
 
 
 def assemble_order_quotation(coin1, coin2, quantity):
-    market_id, market_min_trade = find_market_id(coin1, coin2)
+    market_id = find_market_id(coin1, coin2)
+    market_MinimumTrade = trade_pairs[id]["MinimumTrade"]
+    market_MinimumBaseTrade = trade_pairs[id]["MinimumBaseTrade"]
+    market_TradeFee = trade_pairs[id]["TradeFee"]
+    market_baseSymbol = trade_pairs[id]["baseSymbol"]
+
+
     orders = s.get("https://www.cryptopia.co.nz/api/GetMarketOrderGroups/%s/%s" % (market_id,
                                                                                           max_orders)).json()
     for market in orders["Data"]:
@@ -92,8 +98,8 @@ def assemble_order_quotation(coin1, coin2, quantity):
             if direction == "Sell":
                 order_grand_volume *= 0.998
 
-            if market in weird_markets:
-                order_grand_price = 1 / order_grand_price
+            #if market["Market"] == "LTC_BTC":
+            #    order_grand_price = 1 / order_grand_price
 
     return ([order_grand_volume, order_grand_price, qtd_orders])
 
@@ -104,7 +110,7 @@ global s
 s = requests.Session()
 
 
-max_orders = 10
+max_orders = 30
 balances = {"BTC": 1000,
             "LTC": 1000,
             "DOGE": 1000,
@@ -118,7 +124,7 @@ minimum_order = {"BTC": 0.005,
                  "NZDT": 1}
 
 banned_markets = []
-weird_markets = ["DOGE"]
+weird_markets = []
 
 fiat = {"BTC": float(requests.get("https://api.coinbase.com/v2/prices/BTC-USD/sell").json()["data"]["amount"]),
         "LTC": float(requests.get("https://api.coinbase.com/v2/prices/LTC-USD/sell").json()["data"]["amount"])}
@@ -127,9 +133,9 @@ fiat = {"BTC": float(requests.get("https://api.coinbase.com/v2/prices/BTC-USD/se
 
 coin_pairs = find_market_pairs()
 
-for coin, markets in coin_pairs.iteritems():
-    # if coin == "GBX":
-    if True:
+while True:
+    for coin, markets in coin_pairs.iteritems():
+        # if coin == "GBX":
         logging.debug("Coin %s has %s available markets: (%s)" % (coin, len(markets), ", ".join(markets)))
 
         for initial_market in markets:
@@ -153,34 +159,48 @@ for coin, markets in coin_pairs.iteritems():
                     logging.debug("Eval 3 .. %0.12f %s > %0.12f %s [%s]" % (
                     c[0], intermediary_market, c[1], initial_market, c[2]))
 
-                    xr_initial_coin = a[0] / a[1]
-                    xr_coin_initial = a[1] / a[0]
+                    try:
+                        xr_initial_coin = a[0] / a[1]
+                        xr_coin_initial = a[1] / a[0]
 
-                    xr_coin_intermediary = b[1] / b[0]
-                    xr_intermediary_coin = b[0] / b[1]
-                    xr_intermediary_initial = c[0] / c[1]
+                        xr_coin_intermediary = b[1] / b[0]
+                        xr_intermediary_coin = b[0] / b[1]
+                        xr_intermediary_initial = c[0] / c[1]
 
-                    # logging.debug (" Found exchange rate %s/%s: %0.12f" % (initial_market, coin, xr_initial_coin)
-                    # logging.debug (" Found exchange rate %s/%s: %0.12f" % (coin, initial_market, xr_coin_initial)
-                    # logging.debug (" Found exchange rate %s/%s: %0.12f" % (coin, intermediary_market, xr_coin_intermediary)
-                    # logging.debug (" Found exchange rate %s/%s: %0.12f" % (intermediary_market, coin, xr_intermediary_coin)
-                    # logging.debug (" Found exchange rate %s/%s: %0.12f" % (intermediary_market, initial_market, xr_intermediary_initial)
+                        # logging.debug (" Found exchange rate %s/%s: %0.12f" % (initial_market, coin, xr_initial_coin)
+                        # logging.debug (" Found exchange rate %s/%s: %0.12f" % (coin, initial_market, xr_coin_initial)
+                        # logging.debug (" Found exchange rate %s/%s: %0.12f" % (coin, intermediary_market, xr_coin_intermediary)
+                        # logging.debug (" Found exchange rate %s/%s: %0.12f" % (intermediary_market, coin, xr_intermediary_coin)
+                        # logging.debug (" Found exchange rate %s/%s: %0.12f" % (intermediary_market, initial_market, xr_intermediary_initial)
 
-                    max_for_order_1 = a[1]
-                    max_for_order_2 = b[0] * xr_coin_initial
-                    max_for_order_3 = c[0] / xr_intermediary_initial
+                        max_for_order_1 = a[1]
+                        max_for_order_2 = b[0] * xr_coin_initial
+                        max_for_order_3 = c[0] / xr_intermediary_initial
 
-                    # logging.debug ("Max Orders (%s): %0.12f %0.12f %0.12f" % (initial_market, max_for_order_1, max_for_order_2, max_for_order_3)
+                        # logging.debug ("Max Orders (%s): %0.12f %0.12f %0.12f" % (initial_market, max_for_order_1, max_for_order_2, max_for_order_3)
 
-                    limit_for_order = min(max_for_order_1, max_for_order_2, max_for_order_3)
+                        limit_for_order = min(max_for_order_1, max_for_order_2, max_for_order_3)
 
-                    # logging.debug ("Will use order size of %0.12f %s" % (limit_for_order, initial_market)
+                        # logging.debug ("Will use order size of %0.12f %s" % (limit_for_order, initial_market)
 
-                    amount_1 = limit_for_order
-                    amount_2 = limit_for_order / xr_coin_initial
-                    amount_3 = amount_2 * xr_coin_intermediary
+                        amount_1 = limit_for_order
+                        amount_2 = limit_for_order / xr_coin_initial
+                        amount_3 = amount_2 * xr_coin_intermediary
 
-                    result = amount_3 / xr_intermediary_initial
+
+                        if intermediary_market == "LTC" and initial_market == "BTC" or\
+                           intermediary_market == "DOGE" and initial_market == "BTC" or \
+                           intermediary_market == "DOGE" and initial_market == "LTC" or \
+                           intermediary_market == "DOGE" and initial_market == "USDT" or \
+                           intermediary_market == "DOGE" and initial_market == "NZDT" or \
+                           intermediary_market == "USDT" and initial_market == "NZDT" or\
+                           intermediary_market == "NZDT" and initial_market == "USDT":
+
+                                result = amount_3 / xr_intermediary_initial
+                        else:
+                            result = amount_3 * xr_intermediary_initial
+                    except:
+                        print "",
 
                     logging.debug("Step 1 .. %0.12f %s > %0.12f %s" % (amount_1, initial_market, amount_2, coin))
                     logging.debug("Step 2 .. %0.12f %s > %0.12f %s" % (amount_2, coin, amount_3, intermediary_market))
@@ -191,10 +211,13 @@ for coin, markets in coin_pairs.iteritems():
 
                     # if True:
                     if profit > 0:
-                        # winsound.Beep(5500, 100)
-                        logging.debug("*********** Profit %0.12f %s" % (profit, initial_market))
+                        #winsound.Beep(4000, 2000)
+                        print "*********************** Profit %0.12f %s" % (profit, initial_market),
+
+                        logging.debug("*********************** Profit %0.12f %s" % (profit, initial_market))
                         if initial_market in fiat.iterkeys():
                             logging.debug("( US$ %0.2f )" % (float(fiat[initial_market]) * float(profit)))
+                            print "( US$ %0.2f )" % (float(fiat[initial_market]) * float(profit))
 
                     else:
                         logging.debug("Loss %0.12f %s" % (profit, initial_market))
