@@ -3,6 +3,8 @@ from tabulate import tabulate
 import winsound
 import pprint
 
+import cryptopia_api
+
 from decimal import *
 import logging
 failure_multiplier = 1
