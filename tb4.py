@@ -75,6 +75,10 @@ def assemble_order_quotation(initial_quantity, *pairs):
                 else:
                     actual_quantity = Decimal(quantity)
                 suborder = assemble_suborder(coin1, coin2, actual_quantity, orders)
+
+                if len(suborder) == 0:
+                    raise OverflowError('Empty market!')
+
                 suborder_price = sum(Decimal(row[2]) for row in suborder)
                 suborder_volume = sum(Decimal(row[3]) for row in suborder)
 
@@ -226,37 +230,43 @@ while True:
             for intermediary_market in markets:
                 if initial_market != intermediary_market and \
                         initial_market != coin and \
-                        intermediary_market != coin:
+                        intermediary_market != coin and\
+                        initial_market == "LTC":
                     logging.info(" .. Simulating %s>%s, %s>%s, %s>%s" % (
                         initial_market, coin, coin, intermediary_market, intermediary_market, initial_market))
 
-                    trade = assemble_order_quotation(minimum_order[initial_market], [initial_market, coin],
-                                                     [coin, intermediary_market], [intermediary_market, initial_market])
+                    try:
+
+                        trade = assemble_order_quotation(minimum_order[initial_market], [initial_market, coin],
+                                                         [coin, intermediary_market], [intermediary_market, initial_market])
 
 
 
-                    trade_initial_value = 0
-                    trade_initial_market = trade[0][0]
-                    trade_end_value = 0
-                    trade_end_market = trade[len(trade)-1][0]
+                        trade_initial_value = 0
+                        trade_initial_market = trade[0][0]
+                        trade_end_value = 0
+                        trade_end_market = trade[len(trade)-1][0]
 
 
-                    for line in trade:
-                        if line[0] == trade_initial_market:
-                            if line[4] == initial_market:
-                                trade_initial_value += line[2]
-                            else:
-                                trade_initial_value += line[3]
-                        if line[0] == trade_end_market:
-                            if line[4] == initial_market:
-                                trade_end_value += line[2]
-                            else:
-                                trade_end_value += line[3]
+                        for line in trade:
+                            if line[0] == trade_initial_market:
+                                if line[4] == initial_market:
+                                    trade_initial_value += line[2]
+                                else:
+                                    trade_initial_value += line[3]
+                            if line[0] == trade_end_market:
+                                if line[4] == initial_market:
+                                    trade_end_value += line[2]
+                                else:
+                                    trade_end_value += line[3]
 
-                    profit = trade_end_value - trade_initial_value
-                    if profit > 0:
-                        print "%s -> %s %s" % (trade_initial_value, trade_end_value, initial_market)
-                        print tabulate(trade)
+                        profit = trade_end_value - trade_initial_value
+                        if profit > 0:
+                            print "%s -> %s %s" % (trade_initial_value, trade_end_value, initial_market)
+                            print tabulate(trade)
 
+                    except OverflowError:
+                        logging.info("Market is empty!")
+                        continue
 
 
