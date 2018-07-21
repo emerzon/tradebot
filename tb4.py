@@ -124,6 +124,9 @@ def assemble_suborder(coin1, coin2, quantity, orders):
 
             if reversed_market:
                 direction = "Sell"
+                actual_coin1 = coin1
+                actual_coin2 = coin2
+
                 if quantity < market_MinimumBaseTrade:
                     logger.debug("ORDER TOO SMALL!")
                     logger.debug("Current multiplier is %s" % failure_multiplier)
@@ -135,6 +138,8 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                 price_trade_fee = 1 + (market_TradeFee / 100)
             else:
                 direction = "Buy"
+                actual_coin1 = coin2
+                actual_coin2 = coin1
                 # if quantity < 1/market_MinimumBaseTrade:
                 #    raise Exception('Order too low')
                 price_trade_fee = 1
@@ -170,15 +175,11 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                     order_filling_ratio = 1
                 else:
                     if direction == "Sell":
-                        actual_coin1 = coin1
-                        actual_coin2 = coin2
                         missing_price = Decimal(quantity) - Decimal(suborder_price)
                         if missing_price < market_MinimumBaseTrade:
                             missing_price = market_MinimumBaseTrade
                         order_filling_ratio = missing_price / current_price
                     else:
-                        actual_coin1 = coin2
-                        actual_coin2 = coin1
                         missing_volume = quantity - suborder_volume
                         order_filling_ratio = missing_volume / current_volume
 
@@ -233,5 +234,29 @@ while True:
                                                      [coin, intermediary_market], [intermediary_market, initial_market])
 
 
-                    print tabulate(trade)
+
+                    trade_initial_value = 0
+                    trade_initial_market = trade[0][0]
+                    trade_end_value = 0
+                    trade_end_market = trade[len(trade)-1][0]
+
+
+                    for line in trade:
+                        if line[0] == trade_initial_market:
+                            if line[4] == initial_market:
+                                trade_initial_value += line[2]
+                            else:
+                                trade_initial_value += line[3]
+                        if line[0] == trade_end_market:
+                            if line[4] == initial_market:
+                                trade_end_value += line[2]
+                            else:
+                                trade_end_value += line[3]
+
+                    profit = trade_end_value - trade_initial_value
+                    if profit > 0:
+                        print "%s -> %s %s" % (trade_initial_value, trade_end_value, initial_market)
+                        print tabulate(trade)
+
+
 
