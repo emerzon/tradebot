@@ -11,8 +11,8 @@ global logger
 logging.basicConfig(
     format="%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s",
     handlers=[
-        logging.FileHandler("{0}/{1}.log".format(".", "tb4.log")),
-        logging.StreamHandler()
+        logging.FileHandler("{0}/{1}.log".format(".", "tb4.log")) #,
+        #logging.StreamHandler()
     ],
     level=logging.DEBUG)
 
@@ -70,7 +70,11 @@ def assemble_order_quotation(initial_quantity, *pairs):
         try:
             resulting_orders = []
             for coin1, coin2 in pairs:
-                suborder = assemble_suborder(coin1, coin2, Decimal(quantity) * Decimal(failure_multiplier), orders)
+                if len(resulting_orders) == 0:
+                    actual_quantity = Decimal(quantity) * Decimal(failure_multiplier)
+                else:
+                    actual_quantity = quantity
+                suborder = assemble_suborder(coin1, coin2, actual_quantity, orders)
                 suborder_price = sum(Decimal(row[2]) for row in suborder)
                 suborder_volume = sum(Decimal(row[3]) for row in suborder)
 
@@ -88,15 +92,13 @@ def assemble_order_quotation(initial_quantity, *pairs):
                                                                                        suborder_volume,
                                                                                        coin2))
                     quantity = suborder_price
-                failure_multiplier = 1
+                resulting_orders += suborder
 
         except ValueError:
             logger.info("Increasing initial amount.... %s" % failure_multiplier)
             continue
         break
 
-
-        resulting_orders += suborder["Orders"]
 
     return ({"Profit": Decimal(quantity) - Decimal(initial_quantity),
              "Orders": resulting_orders})
@@ -127,7 +129,7 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                 if quantity < market_MinimumBaseTrade:
                     logger.error("ORDER TOO SMALL!")
                     logger.error("Current multiplier is %s" % failure_multiplier)
-                    failure_multiplier = failure_multiplier * market_MinimumBaseTrade/quantity
+                    failure_multiplier += market_MinimumBaseTrade/quantity
                     logger.error("Increased multiplier is %s" % failure_multiplier)
                     raise ValueError('OrderTooSmall')
 
@@ -231,4 +233,6 @@ while True:
 
                     trade = assemble_order_quotation(minimum_order[initial_market], [initial_market, coin],
                                                      [coin, intermediary_market], [intermediary_market, initial_market])
-                    print trade["Profit"]
+
+                    if trade["Profit"] > 0:
+                        print trade
