@@ -7,6 +7,7 @@ import cryptopia_api
 
 from decimal import *
 import logging
+
 failure_multiplier = 1
 
 global logger
@@ -14,12 +15,13 @@ global logger
 logging.basicConfig(
     format="%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s",
     handlers=[
-        logging.FileHandler("{0}/{1}.log".format(".", "tb4.log")) #,
-        #logging.StreamHandler()
+        logging.FileHandler("{0}/{1}.log".format(".", "tb4.log"))  # ,
+        # logging.StreamHandler()
     ],
-    level=logging.DEBUG)
+    level=logging.ERROR)
 
 logger = logging.getLogger(__name__)
+
 
 def find_market_pairs():
     if "trade_pairs" not in globals():
@@ -51,7 +53,6 @@ def assemble_order_quotation(initial_quantity, *pairs):
     global failure_multiplier
     market_ids = []
     resulting_orders = []
-
 
     for coin1, coin2 in pairs:
         market_ids.append(find_market_id(coin1, coin2)[0])
@@ -87,9 +88,9 @@ def assemble_order_quotation(initial_quantity, *pairs):
                 if suborder[0][1] == "Sell":
                     logger.debug(
                         "[..{4}..] FINAL SUBORDER is {0:.20g} {1} -> {2:.20g} {3}".format(suborder_price, coin1,
-                                                                                       suborder_volume,
-                                                                                       coin2,
-                                                                                       len(resulting_orders)))
+                                                                                          suborder_volume,
+                                                                                          coin2,
+                                                                                          len(resulting_orders)))
                     quantity = suborder_volume
 
                 else:
@@ -122,8 +123,8 @@ def assemble_suborder(coin1, coin2, quantity, orders):
 
             for item in trade_pairs:
                 if market_id == item["Id"]:
-                    market_MinimumBaseTrade = Decimal(item["MinimumBaseTrade"])
                     market_TradeFee = Decimal(item["TradeFee"])
+                    market_MinimumBaseTrade = Decimal(item["MinimumBaseTrade"]) * 1 + (market_TradeFee / 100)
 
             logger.debug(
                 "[....] TradePairId is {0} [MiniminumBaseTrade {1:.20g}]".format(market_id, market_MinimumBaseTrade))
@@ -136,7 +137,7 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                 if quantity < market_MinimumBaseTrade:
                     logger.debug("ORDER TOO SMALL!")
                     logger.debug("Current multiplier is %s" % failure_multiplier)
-                    failure_multiplier += market_MinimumBaseTrade/quantity
+                    failure_multiplier += market_MinimumBaseTrade / quantity
                     logger.debug("Increased multiplier is %s" % failure_multiplier)
                     raise ValueError('OrderTooSmall')
 
@@ -200,14 +201,15 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                             current_price * order_filling_ratio,
                             current_volume * order_filling_ratio,
                             Decimal(market[
-                                      direction][
-                                      len(
-                                          resulting_suborders)][
-                                      "Price"])))
+                                        direction][
+                                        len(
+                                            resulting_suborders)][
+                                        "Price"])))
                     eof = True
 
                 resulting_suborders.append(
-                    [market_id, direction, current_price * order_filling_ratio, current_volume * order_filling_ratio, actual_coin1, actual_coin2,  Decimal(market[direction][len(resulting_suborders)]["Price"])])
+                    [market_id, direction, current_price * order_filling_ratio, current_volume * order_filling_ratio,
+                     actual_coin1, actual_coin2, Decimal(market[direction][len(resulting_suborders)]["Price"])])
                 suborder_price += current_price * order_filling_ratio
                 suborder_volume += current_volume * order_filling_ratio
 
@@ -239,7 +241,7 @@ while True:
             for intermediary_market in markets:
                 if initial_market != intermediary_market and \
                         initial_market != coin and \
-                        intermediary_market != coin and\
+                        intermediary_market != coin and \
                         initial_market in allowed_initial_markets:
                     logging.info(" .. Simulating %s>%s, %s>%s, %s>%s" % (
                         initial_market, coin, coin, intermediary_market, intermediary_market, initial_market))
@@ -247,15 +249,13 @@ while True:
                     try:
 
                         trade = assemble_order_quotation(minimum_order[initial_market], [initial_market, coin],
-                                                         [coin, intermediary_market], [intermediary_market, initial_market])
-
-
+                                                         [coin, intermediary_market],
+                                                         [intermediary_market, initial_market])
 
                         trade_initial_value = 0
                         trade_initial_market = trade[0][0]
                         trade_end_value = 0
-                        trade_end_market = trade[len(trade)-1][0]
-
+                        trade_end_market = trade[len(trade) - 1][0]
 
                         for line in trade:
                             if line[0] == trade_initial_market:
@@ -270,10 +270,11 @@ while True:
                                     trade_end_value += line[3]
 
                         profit = trade_end_value - trade_initial_value
-                        #if True:
+                        # if True:
                         logger.info("-- Profit %s" % profit)
+                        # print tabulate(trade, floatfmt=".20f")
                         if profit > 0:
-                            winsound.Beep(4000, 2000)
+                            winsound.Beep(4000, 200)
                             print "%s -> %s %s" % (trade_initial_value, trade_end_value, initial_market)
                             print tabulate(trade, floatfmt=".20f")
 
@@ -283,5 +284,3 @@ while True:
                     except OverflowError:
                         logging.info("Market is empty!")
                         continue
-
-
