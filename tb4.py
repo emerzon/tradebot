@@ -8,7 +8,7 @@ import cryptopia_api
 from decimal import *
 import logging
 
-failure_multiplier = 1
+failure_multiplier = Decimal(1)
 
 global logger
 
@@ -52,7 +52,6 @@ def find_market_id(coin1, coin2):
 def assemble_order_quotation(initial_quantity, *pairs):
     global failure_multiplier
     market_ids = []
-    resulting_orders = []
 
     for coin1, coin2 in pairs:
         market_ids.append(find_market_id(coin1, coin2)[0])
@@ -82,8 +81,8 @@ def assemble_order_quotation(initial_quantity, *pairs):
                 if len(suborder) == 0:
                     raise OverflowError('Empty market!')
 
-                suborder_price = sum(Decimal(row[2]) for row in suborder)
-                suborder_volume = sum(Decimal(row[3]) for row in suborder)
+                suborder_price = Decimal(sum(Decimal(row[2]) for row in suborder))
+                suborder_volume = Decimal(sum(Decimal(row[3]) for row in suborder))
 
                 if suborder[0][1] == "Sell":
                     logger.debug(
@@ -141,16 +140,16 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                     logger.debug("Increased multiplier is %s" % failure_multiplier)
                     raise ValueError('OrderTooSmall')
 
-                volume_trade_fee = 1
-                price_trade_fee = 1 + (market_TradeFee / 100)
+                volume_trade_fee = Decimal(1)
+                price_trade_fee = Decimal(1 + (market_TradeFee / 100))
             else:
                 direction = "Buy"
                 actual_coin1 = coin2
                 actual_coin2 = coin1
                 # if quantity < 1/market_MinimumBaseTrade:
                 #    raise Exception('Order too low')
-                price_trade_fee = 1
-                volume_trade_fee = 1 - (market_TradeFee / 100)
+                price_trade_fee = Decimal(1)
+                volume_trade_fee = Decimal(1 - (market_TradeFee / 100))
 
             eof = False
             while ((suborder_price < quantity and direction == "Sell") or
@@ -167,8 +166,8 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                         coin1,
                         direction))
 
-                current_volume = Decimal(market[direction][len(resulting_suborders)]["Volume"]) * volume_trade_fee
-                current_price = Decimal(market[direction][len(resulting_suborders)]["Total"]) * price_trade_fee
+                current_volume = Decimal(market[direction][len(resulting_suborders)]["Volume"]) * Decimal(volume_trade_fee)
+                current_price = Decimal(market[direction][len(resulting_suborders)]["Total"]) * Decimal(price_trade_fee)
 
                 if (suborder_volume + current_volume <= quantity and direction == "Buy") or \
                         (suborder_price + current_price <= quantity and direction == "Sell"):
@@ -229,7 +228,7 @@ minimum_order = {"BTC": Decimal(0.0005),
 global s
 s = requests.Session()
 coin_pairs = find_market_pairs()
-max_orders = 50
+max_orders = 20
 
 allowed_initial_markets = ["BTC", "LTC", "DOGE"]
 
