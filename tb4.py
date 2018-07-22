@@ -20,7 +20,7 @@ logging.basicConfig(
         logging.FileHandler("{0}/{1}.log".format(".", "tb4.log"))  # ,
         # logging.StreamHandler()
     ],
-    level=logging.DEBUG)
+    level=logging.ERROR)
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,9 @@ def assemble_order_quotation(initial_quantity, *pairs):
 
     failure_multiplier = Decimal(1)
 
-    while True:
+    for i in range(0, 300):
+        if i == 100:
+            raise OverflowError("Deu merda")
         quantity = initial_quantity
         try:
             resulting_orders = []
@@ -126,6 +128,7 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                 if market_id == item["Id"]:
                     market_TradeFee = Decimal(item["TradeFee"])
                     market_MinimumBaseTrade = Decimal(item["MinimumBaseTrade"]) * 1 + (market_TradeFee / 100)
+                    market_BaseSymbol = item["BaseSymbol"]
 
             logger.debug(
                 "[....] TradePairId is {0} [MiniminumBaseTrade {1:.20g}]".format(market_id, market_MinimumBaseTrade))
@@ -134,6 +137,7 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                 direction = "Sell"
                 actual_coin1 = coin1
                 actual_coin2 = coin2
+                trade_fee = Decimal(1 + (market_TradeFee / 100))
 
                 if quantity < market_MinimumBaseTrade:
                     if len(resulting_suborders) >= len(market[direction]):
@@ -145,16 +149,17 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                         logger.debug("Increased multiplier is %s" % failure_multiplier)
                         raise ValueError('OrderTooSmall')
 
-                volume_trade_fee = Decimal(1)
-                price_trade_fee = Decimal(1 + (market_TradeFee / 100))
+
             else:
                 direction = "Buy"
                 actual_coin1 = coin2
                 actual_coin2 = coin1
                 # if quantity < 1/market_MinimumBaseTrade:
                 #    raise Exception('Order too low')
-                price_trade_fee = Decimal(1)
-                volume_trade_fee = Decimal(1 - (market_TradeFee / 100))
+
+                # TA ERRADO - FEE EH NO BASE MARKET
+                trade_fee = Decimal(1 - (market_TradeFee / 100))
+
 
             eof = False
             while ((suborder_price < quantity and direction == "Sell") or
@@ -171,8 +176,8 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                         coin1,
                         direction))
 
-                current_volume = Decimal(market[direction][len(resulting_suborders)]["Volume"]) * Decimal(volume_trade_fee)
-                current_price = Decimal(market[direction][len(resulting_suborders)]["Total"]) * Decimal(price_trade_fee)
+                current_volume = Decimal(market[direction][len(resulting_suborders)]["Volume"])
+                current_price = Decimal(market[direction][len(resulting_suborders)]["Total"]) * Decimal(trade_fee)
 
                 if (suborder_volume + current_volume <= quantity and direction == "Buy") or \
                         (suborder_price + current_price <= quantity and direction == "Sell"):
@@ -193,7 +198,7 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                             if len(market) == len(resulting_suborders):
                                 raise OverflowError("Market too small!")
                             else:
-                                logger.debug("ORDER TOO SMALL! 2")
+                                logger.debug("ORDER TOO SMALL! 2 Market %s Orders %s" % (len(market[direction]), len(resulting_suborders)))
                                 logger.debug("Current multiplier is %s" % failure_multiplier)
                                 failure_multiplier *= (1+market_MinimumBaseTrade / missing_price)
                                 logger.debug("Increased multiplier is %s" % failure_multiplier)
@@ -228,11 +233,11 @@ def find_common_minimum(*coins):
     return True
 
 
-minimum_order = {"BTC": Decimal(0.0005),
-                 "LTC": Decimal(0.01),
-                 "DOGE": Decimal(100),
-                 "USDT": Decimal(1),
-                 "NZDT": Decimal(1)}
+minimum_order = {"BTC": Decimal(0.0005*1.02),
+                 "LTC": Decimal(0.01*1.02),
+                 "DOGE": Decimal(100*1.02),
+                 "USDT": Decimal(1*1.02),
+                 "NZDT": Decimal(1*1.02)}
 
 global s
 s = requests.Session()
@@ -243,7 +248,6 @@ allowed_initial_markets = ["BTC", "LTC"]
 
 while True:
     for coin, markets in coin_pairs.iteritems():
-        print ".",
 
         logging.info("Coin %s has %s available markets: (%s)" % (coin, len(markets), ", ".join(markets)))
 
@@ -253,7 +257,7 @@ while True:
                         initial_market != coin and \
                         intermediary_market != coin and \
                         initial_market in allowed_initial_markets:
-                    logging.info(" .. Simulating %s>%s, %s>%s, %s>%s" % (
+                    logging.error(" .. Simulating %s>%s, %s>%s, %s>%s" % (
                         initial_market, coin, coin, intermediary_market, intermediary_market, initial_market))
 
                     try:
@@ -289,9 +293,9 @@ while True:
                             print tabulate(trade, floatfmt=".20f")
 
                             with open("profit.txt", "a") as myfile:
-                                myfile.write("%s -> %s %s" % (trade_initial_value, trade_end_value, initial_market))
+                                myfile.write("%s -> %s %s\n" % (trade_initial_value, trade_end_value, initial_market))
                                 myfile.write(tabulate(trade, floatfmt=".20f"))
-                                myfile.write("\n\n")
+                                myfile.write("\n\n\n")
 
                             if len(trade) == 3:
                                 print "+++++++++++ AUTO PROCEED"
