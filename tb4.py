@@ -136,11 +136,14 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                 actual_coin2 = coin2
 
                 if quantity < market_MinimumBaseTrade:
-                    logger.debug("ORDER TOO SMALL! 1")
-                    logger.debug("Current multiplier is %s" % failure_multiplier)
-                    failure_multiplier *= (1+market_MinimumBaseTrade / quantity)
-                    logger.debug("Increased multiplier is %s" % failure_multiplier)
-                    raise ValueError('OrderTooSmall')
+                    if len(resulting_suborders) >= len(market[direction]):
+                        raise OverflowError("Market too small!")
+                    else:
+                        logger.debug("ORDER TOO SMALL! 1 Market %s Orders %s" % (len(market[direction]), len(resulting_suborders)))
+                        logger.debug("Current multiplier is %s" % failure_multiplier)
+                        failure_multiplier *= (1+market_MinimumBaseTrade / quantity)
+                        logger.debug("Increased multiplier is %s" % failure_multiplier)
+                        raise ValueError('OrderTooSmall')
 
                 volume_trade_fee = Decimal(1)
                 price_trade_fee = Decimal(1 + (market_TradeFee / 100))
@@ -288,6 +291,7 @@ while True:
                             with open("profit.txt", "a") as myfile:
                                 myfile.write("%s -> %s %s" % (trade_initial_value, trade_end_value, initial_market))
                                 myfile.write(tabulate(trade, floatfmt=".20f"))
+                                myfile.write("\n\n")
 
                             if len(trade) == 3:
                                 print "+++++++++++ AUTO PROCEED"
