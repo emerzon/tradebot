@@ -20,7 +20,7 @@ logging.basicConfig(
         logging.FileHandler("{0}/{1}.log".format(".", "tb4.log"))  # ,
         # logging.StreamHandler()
     ],
-    level=logging.ERROR)
+    level=logging.DEBUG)
 
 logger = logging.getLogger(__name__)
 
