@@ -6,6 +6,8 @@ import pprint
 import cryptopia_api
 
 from decimal import *
+getcontext().prec = 15
+
 import logging
 
 failure_multiplier = Decimal(1)
@@ -18,7 +20,7 @@ logging.basicConfig(
         logging.FileHandler("{0}/{1}.log".format(".", "tb4.log"))  # ,
         # logging.StreamHandler()
     ],
-    level=logging.ERROR)
+    level=logging.DEBUG)
 
 logger = logging.getLogger(__name__)
 
@@ -134,9 +136,9 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                 actual_coin2 = coin2
 
                 if quantity < market_MinimumBaseTrade:
-                    logger.debug("ORDER TOO SMALL!")
+                    logger.debug("ORDER TOO SMALL! 1")
                     logger.debug("Current multiplier is %s" % failure_multiplier)
-                    failure_multiplier += market_MinimumBaseTrade / quantity
+                    failure_multiplier *= (1+market_MinimumBaseTrade / quantity)
                     logger.debug("Increased multiplier is %s" % failure_multiplier)
                     raise ValueError('OrderTooSmall')
 
@@ -183,12 +185,16 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                 else:
                     if direction == "Sell":
                         missing_price = Decimal(quantity) - Decimal(suborder_price)
+                        logger.debug("Missing price %s " % missing_price)
                         if missing_price < market_MinimumBaseTrade:
-                            logger.debug("ORDER TOO SMALL!")
-                            logger.debug("Current multiplier is %s" % failure_multiplier)
-                            failure_multiplier += market_MinimumBaseTrade / missing_price
-                            logger.debug("Increased multiplier is %s" % failure_multiplier)
-                            raise ValueError('OrderTooSmall')
+                            if len(market) == len(resulting_suborders):
+                                raise OverflowError("Market too small!")
+                            else:
+                                logger.debug("ORDER TOO SMALL! 2")
+                                logger.debug("Current multiplier is %s" % failure_multiplier)
+                                failure_multiplier *= (1+market_MinimumBaseTrade / missing_price)
+                                logger.debug("Increased multiplier is %s" % failure_multiplier)
+                                raise ValueError('OrderTooSmall')
                         order_filling_ratio = missing_price / current_price
                     else:
                         missing_volume = quantity - suborder_volume
@@ -228,12 +234,14 @@ minimum_order = {"BTC": Decimal(0.0005),
 global s
 s = requests.Session()
 coin_pairs = find_market_pairs()
-max_orders = 20
+max_orders = 50
 
-allowed_initial_markets = ["BTC", "LTC", "DOGE"]
+allowed_initial_markets = ["BTC", "LTC"]
 
 while True:
     for coin, markets in coin_pairs.iteritems():
+        print ".",
+
         logging.info("Coin %s has %s available markets: (%s)" % (coin, len(markets), ", ".join(markets)))
 
         for initial_market in markets:
@@ -276,6 +284,10 @@ while True:
                             winsound.Beep(4000, 200)
                             print "%s -> %s %s" % (trade_initial_value, trade_end_value, initial_market)
                             print tabulate(trade, floatfmt=".20f")
+
+                            with open("profit.txt", "a") as myfile:
+                                myfile.write("%s -> %s %s" % (trade_initial_value, trade_end_value, initial_market))
+                                myfile.write(tabulate(trade, floatfmt=".20f"))
 
                             if len(trade) == 3:
                                 print "+++++++++++ AUTO PROCEED"
