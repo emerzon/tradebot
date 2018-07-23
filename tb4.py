@@ -24,6 +24,13 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+global s
+s = requests.Session()
+
+def fetch_fiat(coin):
+    btc_value = float(requests.get("https://api.coinbase.com/v2/prices/BTC-USD/sell").json()['data']['amount'])
+    ltc_value = float(requests.get("https://api.coinbase.com/v2/prices/LTC-USD/sell").json()['data']['amount'])
+
 
 def find_market_pairs():
     if "trade_pairs" not in globals():
@@ -239,67 +246,133 @@ minimum_order = {"BTC": Decimal(0.0005*1.02),
                  "USDT": Decimal(1*1.02),
                  "NZDT": Decimal(1*1.02)}
 
-global s
-s = requests.Session()
 coin_pairs = find_market_pairs()
 max_orders = 50
 
-allowed_initial_markets = ["BTC", "LTC"]
 
-while True:
-    for coin, markets in coin_pairs.iteritems():
+def three_way_probe():
+    allowed_initial_markets = ["BTC", "LTC", "DOGE", "USDT", "NZDT"]
 
-        logging.info("Coin %s has %s available markets: (%s)" % (coin, len(markets), ", ".join(markets)))
+    while True:
+        for coin, markets in coin_pairs.iteritems():
 
-        for initial_market in markets:
-            for intermediary_market in markets:
-                if initial_market != intermediary_market and \
-                        initial_market != coin and \
-                        intermediary_market != coin and \
-                        initial_market in allowed_initial_markets:
-                    logging.error(" .. Simulating %s>%s, %s>%s, %s>%s" % (
-                        initial_market, coin, coin, intermediary_market, intermediary_market, initial_market))
+            logging.info("Coin %s has %s available markets: (%s)" % (coin, len(markets), ", ".join(markets)))
 
-                    try:
+            for initial_market in markets:
+                for intermediary_market in markets:
+                    if initial_market != intermediary_market and \
+                            initial_market != coin and \
+                            intermediary_market != coin and \
+                            initial_market in allowed_initial_markets:
+                        logging.error(" .. Simulating %s>%s, %s>%s, %s>%s" % (
+                            initial_market, coin, coin, intermediary_market, intermediary_market, initial_market))
 
-                        trade = assemble_order_quotation(minimum_order[initial_market], [initial_market, coin],
-                                                         [coin, intermediary_market],
-                                                         [intermediary_market, initial_market])
+                        try:
 
-                        trade_initial_value = 0
-                        trade_initial_market = trade[0][0]
-                        trade_end_value = 0
-                        trade_end_market = trade[len(trade) - 1][0]
+                            trade = assemble_order_quotation(minimum_order[initial_market], [initial_market, coin],
+                                                             [coin, intermediary_market],
+                                                             [intermediary_market, initial_market])
 
-                        for line in trade:
-                            if line[0] == trade_initial_market:
-                                if line[4] == initial_market:
-                                    trade_initial_value += line[2]
-                                else:
-                                    trade_initial_value += line[3]
-                            if line[0] == trade_end_market:
-                                if line[4] == initial_market:
-                                    trade_end_value += line[2]
-                                else:
-                                    trade_end_value += line[3]
+                            trade_initial_value = 0
+                            trade_initial_market = trade[0][0]
+                            trade_end_value = 0
+                            trade_end_market = trade[len(trade) - 1][0]
 
-                        profit = trade_end_value - trade_initial_value
-                        # if True:
-                        logger.info("-- Profit %s" % profit)
-                        # print tabulate(trade, floatfmt=".20f")
-                        if profit > 0:
-                            winsound.Beep(4000, 200)
-                            print "%s -> %s %s" % (trade_initial_value, trade_end_value, initial_market)
-                            print tabulate(trade, floatfmt=".20f")
+                            for line in trade:
+                                if line[0] == trade_initial_market:
+                                    if line[4] == initial_market:
+                                        trade_initial_value += line[2]
+                                    else:
+                                        trade_initial_value += line[3]
+                                if line[0] == trade_end_market:
+                                    if line[4] == initial_market:
+                                        trade_end_value += line[2]
+                                    else:
+                                        trade_end_value += line[3]
 
-                            with open("profit.txt", "a") as myfile:
-                                myfile.write("%s -> %s %s\n" % (trade_initial_value, trade_end_value, initial_market))
-                                myfile.write(tabulate(trade, floatfmt=".20f"))
-                                myfile.write("\n\n\n")
+                            profit = trade_end_value - trade_initial_value
+                            # if True:
+                            logger.info("-- Profit %s" % profit)
+                            # print tabulate(trade, floatfmt=".20f")
+                            if profit > 0:
+                                winsound.Beep(4000, 200)
+                                print "%s -> %s %s" % (trade_initial_value, trade_end_value, initial_market)
+                                print tabulate(trade, floatfmt=".20f")
 
-                            if len(trade) == 3:
-                                print "+++++++++++ AUTO PROCEED"
+                                with open("profit.txt", "a") as myfile:
+                                    myfile.write("%s -> %s %s\n" % (trade_initial_value, trade_end_value, initial_market))
+                                    myfile.write(tabulate(trade, floatfmt=".20f"))
+                                    myfile.write("\n\n\n")
 
-                    except OverflowError:
-                        logging.info("Market is empty!")
-                        continue
+                                if len(trade) == 3:
+                                    print "+++++++++++ AUTO PROCEED"
+
+                        except OverflowError:
+                            logging.info("Market is empty!")
+                            continue
+
+def two_way_probe():
+    allowed_markets = ["BTC", "LTC"]
+
+    while True:
+        for coin, markets in coin_pairs.iteritems():
+
+            logging.info("Coin %s has %s available markets: (%s)" % (coin, len(markets), ", ".join(markets)))
+
+            for initial_market in markets:
+                for final_market in markets:
+                    if initial_market != coin and \
+                        final_market != coin and \
+                        initial_market in allowed_markets and \
+                        final_market in allowed_markets and \
+                        initial_market != final_market:
+
+                   logging.error(" .. Simulating %s>%s, %s>%s" % (
+                            initial_market, coin, coin, final_market))
+
+                        try:
+
+                            trade = assemble_order_quotation(minimum_order[initial_market], [initial_market, coin],
+                                                             [coin, initial_market])
+
+                            trade_initial_value = 0
+                            trade_initial_market = trade[0][0]
+                            trade_end_value = 0
+                            trade_end_market = trade[len(trade) - 1][0]
+
+                            for line in trade:
+                                if line[0] == trade_initial_market:
+                                    if line[4] == initial_market:
+                                        trade_initial_value += line[2]
+                                    else:
+                                        trade_initial_value += line[3]
+                                if line[0] == trade_end_market:
+                                    if line[4] == initial_market:
+                                        trade_end_value += line[2]
+                                    else:
+                                        trade_end_value += line[3]
+
+                            profit = trade_end_value - trade_initial_value
+                            # if True:
+                            logger.info("-- Profit %s" % profit)
+                            # print tabulate(trade, floatfmt=".20f")
+                            if profit > 0:
+                                winsound.Beep(4000, 200)
+                                print "%s -> %s %s" % (trade_initial_value, trade_end_value, initial_market)
+                                print tabulate(trade, floatfmt=".20f")
+
+                                with open("profit.txt", "a") as myfile:
+                                    myfile.write(
+                                        "%s -> %s %s\n" % (trade_initial_value, trade_end_value, initial_market))
+                                    myfile.write(tabulate(trade, floatfmt=".20f"))
+                                    myfile.write("\n\n\n")
+
+                                if len(trade) == 3:
+                                    print "+++++++++++ AUTO PROCEED"
+
+                        except OverflowError:
+                            logging.info("Market is empty!")
+                            continue
+
+
+three_way_probe()
