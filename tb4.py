@@ -1,19 +1,32 @@
+# Stupid imports
 import requests
 from tabulate import tabulate
-import winsound
+# import winsound
 import pprint
-
 import cryptopia_api
-
 from decimal import *
-getcontext().prec = 15
-
 import logging
+import datetime
 
+# Init settings
+getcontext().prec = 15
+fiat_ttl = 10
+
+# Variable inits
 failure_multiplier = Decimal(1)
+s = requests.Session()
+fiat_values = {}
+fiat_lastcheck = {}
 
-global logger
+minimum_order = {"BTC": Decimal(0.0005 * 1.02),
+                 "LTC": Decimal(0.01 * 1.02),
+                 "DOGE": Decimal(100 * 1.02),
+                 "USDT": Decimal(1 * 1.02),
+                 "NZDT": Decimal(1 * 1.02)}
 
+max_orders = 50
+
+# Logger settings
 logging.basicConfig(
     format="%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s",
     handlers=[
@@ -24,12 +37,19 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-global s
-s = requests.Session()
 
 def fetch_fiat(coin):
-    btc_value = float(requests.get("https://api.coinbase.com/v2/prices/BTC-USD/sell").json()['data']['amount'])
-    ltc_value = float(requests.get("https://api.coinbase.com/v2/prices/LTC-USD/sell").json()['data']['amount'])
+    global fiat_values
+    global fiat_lastcheck
+
+    last_check = fiat_lastcheck.get(coin, datetime.datetime(1970, 1, 1))
+
+    if (datetime.datetime.now() - last_check).total_seconds() > fiat_ttl:
+        value = Decimal(requests.get("https://api.coinbase.com/v2/prices/%s-USD/sell" % coin).json()['data']['amount'])
+        fiat_values[coin] = value
+        fiat_lastcheck[coin] = datetime.datetime.now()
+
+    return fiat_values[coin]
 
 
 def find_market_pairs():
@@ -150,9 +170,10 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                     if len(resulting_suborders) >= len(market[direction]):
                         raise OverflowError("Market too small!")
                     else:
-                        logger.debug("ORDER TOO SMALL! 1 Market %s Orders %s" % (len(market[direction]), len(resulting_suborders)))
+                        logger.debug("ORDER TOO SMALL! 1 Market %s Orders %s" % (
+                        len(market[direction]), len(resulting_suborders)))
                         logger.debug("Current multiplier is %s" % failure_multiplier)
-                        failure_multiplier *= (1+market_MinimumBaseTrade / quantity)
+                        failure_multiplier *= (1 + market_MinimumBaseTrade / quantity)
                         logger.debug("Increased multiplier is %s" % failure_multiplier)
                         raise ValueError('OrderTooSmall')
 
@@ -166,7 +187,6 @@ def assemble_suborder(coin1, coin2, quantity, orders):
 
                 # TA ERRADO - FEE EH NO BASE MARKET
                 trade_fee = Decimal(1 - (market_TradeFee / 100))
-
 
             eof = False
             while ((suborder_price < quantity and direction == "Sell") or
@@ -205,9 +225,10 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                             if len(market) == len(resulting_suborders):
                                 raise OverflowError("Market too small!")
                             else:
-                                logger.debug("ORDER TOO SMALL! 2 Market %s Orders %s" % (len(market[direction]), len(resulting_suborders)))
+                                logger.debug("ORDER TOO SMALL! 2 Market %s Orders %s" % (
+                                len(market[direction]), len(resulting_suborders)))
                                 logger.debug("Current multiplier is %s" % failure_multiplier)
-                                failure_multiplier *= (1+market_MinimumBaseTrade / missing_price)
+                                failure_multiplier *= (1 + market_MinimumBaseTrade / missing_price)
                                 logger.debug("Increased multiplier is %s" % failure_multiplier)
                                 raise ValueError('OrderTooSmall')
                         order_filling_ratio = missing_price / current_price
@@ -238,16 +259,6 @@ def assemble_suborder(coin1, coin2, quantity, orders):
 
 def find_common_minimum(*coins):
     return True
-
-
-minimum_order = {"BTC": Decimal(0.0005*1.02),
-                 "LTC": Decimal(0.01*1.02),
-                 "DOGE": Decimal(100*1.02),
-                 "USDT": Decimal(1*1.02),
-                 "NZDT": Decimal(1*1.02)}
-
-coin_pairs = find_market_pairs()
-max_orders = 50
 
 
 def three_way_probe():
@@ -300,7 +311,8 @@ def three_way_probe():
                                 print tabulate(trade, floatfmt=".20f")
 
                                 with open("profit.txt", "a") as myfile:
-                                    myfile.write("%s -> %s %s\n" % (trade_initial_value, trade_end_value, initial_market))
+                                    myfile.write(
+                                        "%s -> %s %s\n" % (trade_initial_value, trade_end_value, initial_market))
                                     myfile.write(tabulate(trade, floatfmt=".20f"))
                                     myfile.write("\n\n\n")
 
@@ -310,6 +322,7 @@ def three_way_probe():
                         except OverflowError:
                             logging.info("Market is empty!")
                             continue
+
 
 def two_way_probe():
     allowed_markets = ["BTC", "LTC"]
@@ -322,12 +335,12 @@ def two_way_probe():
             for initial_market in markets:
                 for final_market in markets:
                     if initial_market != coin and \
-                        final_market != coin and \
-                        initial_market in allowed_markets and \
-                        final_market in allowed_markets and \
-                        initial_market != final_market:
+                            final_market != coin and \
+                            initial_market in allowed_markets and \
+                            final_market in allowed_markets and \
+                            initial_market != final_market:
 
-                   logging.error(" .. Simulating %s>%s, %s>%s" % (
+                        logging.error(" .. Simulating %s>%s, %s>%s" % (
                             initial_market, coin, coin, final_market))
 
                         try:
@@ -375,4 +388,11 @@ def two_way_probe():
                             continue
 
 
-three_way_probe()
+# Start here
+
+# coin_pairs = find_market_pairs()
+
+# three_way_probe()
+
+while True:
+    print fetch_fiat("BTC")
