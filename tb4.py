@@ -38,6 +38,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+# Functions Begin here
+# ----------------------------------------------------------------------------------------------------------------------
+
 def fetch_fiat(coin):
     global fiat_values
     global fiat_lastcheck
@@ -389,6 +392,7 @@ def two_way_probe():
 
 
 # Start here
+# ----------------------------------------------------------------------------------------------------------------------
 
 # coin_pairs = find_market_pairs()
 
@@ -396,3 +400,4 @@ def two_way_probe():
 
 while True:
     print fetch_fiat("BTC")
+    print fetch_fiat("LTC")
