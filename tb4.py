@@ -1,7 +1,7 @@
 # Stupid imports
 import requests
 from tabulate import tabulate
-# import winsound
+import winsound
 import pprint
 import cryptopia_api
 from decimal import *
@@ -18,11 +18,11 @@ s = requests.Session()
 fiat_values = {}
 fiat_lastcheck = {}
 
-minimum_order = {"BTC": Decimal(0.0005 * 1.02),
-                 "LTC": Decimal(0.01 * 1.02),
-                 "DOGE": Decimal(100 * 1.02),
-                 "USDT": Decimal(1 * 1.02),
-                 "NZDT": Decimal(1 * 1.02)}
+minimum_order = {"BTC": Decimal(0.0005 * 1.002),
+                 "LTC": Decimal(0.01 * 1.002),
+                 "DOGE": Decimal(100 * 1.002),
+                 "USDT": Decimal(1 * 1.002),
+                 "NZDT": Decimal(1 * 1.002)}
 
 max_orders = 50
 
@@ -169,24 +169,29 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                 actual_coin2 = coin2
                 trade_fee = Decimal(1 + (market_TradeFee / 100))
 
-                if quantity < market_MinimumBaseTrade:
-                    if len(resulting_suborders) >= len(market[direction]):
-                        raise OverflowError("Market too small!")
-                    else:
-                        logger.debug("ORDER TOO SMALL! 1 Market %s Orders %s" % (
-                        len(market[direction]), len(resulting_suborders)))
-                        logger.debug("Current multiplier is %s" % failure_multiplier)
-                        failure_multiplier *= (1 + market_MinimumBaseTrade / quantity)
-                        logger.debug("Increased multiplier is %s" % failure_multiplier)
-                        raise ValueError('OrderTooSmall')
+                # if quantity < market_MinimumBaseTrade:
+                #     if len(resulting_suborders) >= len(market[direction]):
+                #         raise OverflowError("Market too small!")
+                #     else:
+                #         logger.debug("ORDER TOO SMALL! 1 Market %s Orders %s" % (
+                #             len(market[direction]), len(resulting_suborders)))
+                #         logger.debug("Current multiplier is %s" % failure_multiplier)
+                #         failure_multiplier *= (1 + market_MinimumBaseTrade / quantity)
+                #         logger.debug("Increased multiplier is %s" % failure_multiplier)
+                #         raise ValueError('OrderTooSmall')
 
 
             else:
                 direction = "Buy"
                 actual_coin1 = coin2
                 actual_coin2 = coin1
-                # if quantity < 1/market_MinimumBaseTrade:
-                #    raise Exception('Order too low')
+                if quantity < market_MinimumBaseTrade:
+                    logger.debug("ORDER TOO SMALL! 1 Market %s Orders %s" % (
+                        len(market[direction]), len(resulting_suborders)))
+                    logger.debug("Current multiplier is %s" % failure_multiplier)
+                    failure_multiplier = failure_multiplier + ((market_MinimumBaseTrade / quantity)-1)
+                    logger.debug("Increased multiplier is %s" % failure_multiplier)
+                    raise ValueError('OrderTooSmall')
 
                 # TA ERRADO - FEE EH NO BASE MARKET
                 trade_fee = Decimal(1 - (market_TradeFee / 100))
@@ -224,16 +229,16 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                     if direction == "Sell":
                         missing_price = Decimal(quantity) - Decimal(suborder_price)
                         logger.debug("Missing price %s " % missing_price)
-                        if missing_price < market_MinimumBaseTrade:
-                            if len(market) == len(resulting_suborders):
-                                raise OverflowError("Market too small!")
-                            else:
-                                logger.debug("ORDER TOO SMALL! 2 Market %s Orders %s" % (
-                                len(market[direction]), len(resulting_suborders)))
-                                logger.debug("Current multiplier is %s" % failure_multiplier)
-                                failure_multiplier *= (1 + market_MinimumBaseTrade / missing_price)
-                                logger.debug("Increased multiplier is %s" % failure_multiplier)
-                                raise ValueError('OrderTooSmall')
+                        # if missing_price < market_MinimumBaseTrade:
+                        #     if len(market) == len(resulting_suborders):
+                        #         raise OverflowError("Market too small!")
+                        #     else:
+                        #         logger.debug("ORDER TOO SMALL! 2 Market %s Orders %s" % (
+                        #             len(market[direction]), len(resulting_suborders)))
+                        #         logger.debug("Current multiplier is %s" % failure_multiplier)
+                        #         failure_multiplier *= (1 + market_MinimumBaseTrade / missing_price)
+                        #         logger.debug("Increased multiplier is %s" % failure_multiplier)
+                        #         raise ValueError('OrderTooSmall')
                         order_filling_ratio = missing_price / current_price
                     else:
                         missing_volume = quantity - suborder_volume
@@ -349,7 +354,8 @@ def two_way_probe():
                         try:
 
                             trade = assemble_order_quotation(minimum_order[initial_market], [initial_market, coin],
-                                                             [coin, initial_market])
+                                                             [coin, final_market])
+
 
                             trade_initial_value = 0
                             trade_initial_market = trade[0][0]
@@ -363,28 +369,31 @@ def two_way_probe():
                                     else:
                                         trade_initial_value += line[3]
                                 if line[0] == trade_end_market:
-                                    if line[4] == initial_market:
+                                    if line[4] == final_market:
                                         trade_end_value += line[2]
                                     else:
                                         trade_end_value += line[3]
 
-                            profit = trade_end_value - trade_initial_value
-                            # if True:
+                            profit = trade_end_value * fetch_fiat(final_market) - trade_initial_value * fetch_fiat(initial_market)
+
                             logger.info("-- Profit %s" % profit)
-                            # print tabulate(trade, floatfmt=".20f")
+                            profit_string = "%s -> %s | %s %s -> %s %s" % (trade_initial_value * fetch_fiat(initial_market),
+                                                                 trade_end_value * fetch_fiat(final_market),
+                                                                 trade_initial_value, initial_market,
+                                                                 trade_end_value, final_market)
+                            print profit_string
                             if profit > 0:
                                 winsound.Beep(4000, 200)
-                                print "%s -> %s %s" % (trade_initial_value, trade_end_value, initial_market)
+                                print profit_string
                                 print tabulate(trade, floatfmt=".20f")
 
                                 with open("profit.txt", "a") as myfile:
                                     myfile.write(
                                         "%s -> %s %s\n" % (trade_initial_value, trade_end_value, initial_market))
-                                    myfile.write(tabulate(trade, floatfmt=".20f"))
+                                    myfile.write(profit_string + "\n")
+                                    myfile.write(tabulate(trade, floatfmt=".20f")+"\n")
                                     myfile.write("\n\n\n")
 
-                                if len(trade) == 3:
-                                    print "+++++++++++ AUTO PROCEED"
 
                         except OverflowError:
                             logging.info("Market is empty!")
@@ -394,10 +403,12 @@ def two_way_probe():
 # Start here
 # ----------------------------------------------------------------------------------------------------------------------
 
-# coin_pairs = find_market_pairs()
+coin_pairs = find_market_pairs()
 
 # three_way_probe()
 
-while True:
-    print fetch_fiat("BTC")
-    print fetch_fiat("LTC")
+two_way_probe()
+
+# while True:
+#     print fetch_fiat("BTC")
+#     print fetch_fiat("LTC")
