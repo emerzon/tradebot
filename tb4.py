@@ -19,9 +19,9 @@ fiat_values = {}
 fiat_lastcheck = {}
 
 minimum_order = {"BTC": Decimal(0.0005 * 1.002),
-                 "LTC": Decimal(0.01 * 1.002),
+                 "LTC": Decimal(0.048 * 1.002),
                  "DOGE": Decimal(100 * 1.002),
-                 "USDT": Decimal(1 * 1.002),
+                 "USDT": Decimal(5 * 1.002),
                  "NZDT": Decimal(1 * 1.002)}
 
 max_orders = 50
@@ -45,14 +45,22 @@ def fetch_fiat(coin):
     global fiat_values
     global fiat_lastcheck
 
-    last_check = fiat_lastcheck.get(coin, datetime.datetime(1970, 1, 1))
 
-    if (datetime.datetime.now() - last_check).total_seconds() > fiat_ttl:
-        value = Decimal(requests.get("https://api.coinbase.com/v2/prices/%s-USD/sell" % coin).json()['data']['amount'])
-        fiat_values[coin] = value
-        fiat_lastcheck[coin] = datetime.datetime.now()
+    if coin in ["BTC", "LTC"]:
+        last_check = fiat_lastcheck.get(coin, datetime.datetime(1970, 1, 1))
 
-    return fiat_values[coin]
+
+        if (datetime.datetime.now() - last_check).total_seconds() > fiat_ttl:
+            value = Decimal(requests.get("https://api.coinbase.com/v2/prices/%s-USD/sell" % coin).json()['data']['amount'])
+            fiat_values[coin] = value
+            fiat_lastcheck[coin] = datetime.datetime.now()
+
+        return fiat_values[coin]
+
+    elif coin in ["USDT"]:
+        return 1
+    else:
+        return 0
 
 
 def find_market_pairs():
@@ -185,13 +193,13 @@ def assemble_suborder(coin1, coin2, quantity, orders):
                 direction = "Buy"
                 actual_coin1 = coin2
                 actual_coin2 = coin1
-                if quantity < market_MinimumBaseTrade:
-                    logger.debug("ORDER TOO SMALL! 1 Market %s Orders %s" % (
-                        len(market[direction]), len(resulting_suborders)))
-                    logger.debug("Current multiplier is %s" % failure_multiplier)
-                    failure_multiplier = failure_multiplier + ((market_MinimumBaseTrade / quantity)-1)
-                    logger.debug("Increased multiplier is %s" % failure_multiplier)
-                    raise ValueError('OrderTooSmall')
+                # if quantity < market_MinimumBaseTrade:
+                #     logger.debug("ORDER TOO SMALL! 1 Market %s Orders %s" % (
+                #         len(market[direction]), len(resulting_suborders)))
+                #     logger.debug("Current multiplier is %s" % failure_multiplier)
+                #     failure_multiplier = failure_multiplier + ((market_MinimumBaseTrade / quantity)-1)
+                #     logger.debug("Increased multiplier is %s" % failure_multiplier)
+                #     raise ValueError('OrderTooSmall')
 
                 # TA ERRADO - FEE EH NO BASE MARKET
                 trade_fee = Decimal(1 - (market_TradeFee / 100))
@@ -333,7 +341,7 @@ def three_way_probe():
 
 
 def two_way_probe():
-    allowed_markets = ["BTC", "LTC"]
+    allowed_markets = ["BTC", "LTC", "USDT"]
 
     while True:
         for coin, markets in coin_pairs.iteritems():
