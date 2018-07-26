@@ -3,10 +3,15 @@ import requests
 from tabulate import tabulate
 import winsound
 import pprint
-import cryptopia_api
+
 from decimal import *
 import logging
 import datetime
+import time
+
+
+from cryptopia_api import Api
+api_wrapper = Api("","")
 
 # Init settings
 getcontext().prec = 15
@@ -17,6 +22,7 @@ failure_multiplier = Decimal(1)
 s = requests.Session()
 fiat_values = {}
 fiat_lastcheck = {}
+trade_pairs={}
 
 minimum_order = {"BTC": Decimal(0.0005 * 1.002),
                  "LTC": Decimal(0.048 * 1.002),
@@ -44,29 +50,21 @@ logger = logging.getLogger(__name__)
 def fetch_fiat(coin):
     global fiat_values
     global fiat_lastcheck
-
-
     if coin in ["BTC", "LTC"]:
         last_check = fiat_lastcheck.get(coin, datetime.datetime(1970, 1, 1))
-
-
         if (datetime.datetime.now() - last_check).total_seconds() > fiat_ttl:
             value = Decimal(requests.get("https://api.coinbase.com/v2/prices/%s-USD/sell" % coin).json()['data']['amount'])
             fiat_values[coin] = value
             fiat_lastcheck[coin] = datetime.datetime.now()
-
         return fiat_values[coin]
-
     elif coin in ["USDT"]:
-        return 1
+        return Decimal(0.999)
     else:
         return 0
 
-
 def find_market_pairs():
-    if "trade_pairs" not in globals():
-        global trade_pairs
-        trade_pairs = s.get("https://www.cryptopia.co.nz/api/GetTradePairs", stream=False).json()["Data"]
+    global trade_pairs
+    trade_pairs = s.get("https://www.cryptopia.co.nz/api/GetTradePairs", stream=False).json()["Data"]
     pairs = {}
     for coin in trade_pairs:
         markets = []
@@ -79,14 +77,23 @@ def find_market_pairs():
 
 
 def find_market_id(coin1, coin2):
+    global trade_pairs
     for item in trade_pairs:
         if item["Label"] == "%s/%s" % (coin1, coin2) or item["Label"] == "%s/%s" % (coin2, coin1):
             if coin1 == item["BaseSymbol"]:
                 reversed_market = True
             else:
                 reversed_market = False
-
             return item["Id"], reversed_market
+
+
+def find_market_coins(market_id):
+    global trade_pairs
+    for item in trade_pairs:
+        print item["Id"]
+        if item["Id"] == market_id:
+            return [item["Symbol"], item["BaseSymbol"]]
+    return None
 
 
 def assemble_order_quotation(initial_quantity, *pairs):
@@ -276,6 +283,19 @@ def assemble_suborder(coin1, coin2, quantity, orders):
 def find_common_minimum(*coins):
     return True
 
+def do_trade(*orders):
+    logging.debug("--!!!!! Executing %s trade orders!" % len(orders))
+    print orders
+    for market, trade_type, rate, amount in orders:
+        logger.debug("------ Market: %s - %s, %s, %s" % (market, trade_type, rate, amount))
+        coin1, coin2 = find_market_coins(market)
+        coin_balance = 0
+        while (rate * amount) > coin_balance:
+            coin_balance = Decimal(api_wrapper.get_balance(coin1)[0]["Available"])
+            logging.debug("Current %s balance: %s" % (coin1, coin_balance))
+        logger.debug("Here the jurupoca piates")
+        #api_wrapper.submit_trade(market, trade_type, rate, amount)
+
 
 def three_way_probe():
     allowed_initial_markets = ["BTC", "LTC", "DOGE", "USDT", "NZDT"]
@@ -370,6 +390,9 @@ def two_way_probe():
                             trade_end_value = 0
                             trade_end_market = trade[len(trade) - 1][0]
 
+                            cols = zip(*trade)
+
+
                             for line in trade:
                                 if line[0] == trade_initial_market:
                                     if line[4] == initial_market:
@@ -402,6 +425,8 @@ def two_way_probe():
                                     myfile.write(tabulate(trade, floatfmt=".20f")+"\n")
                                     myfile.write("\n\n\n")
 
+                                do_trade(trade[1:4])
+
 
                         except OverflowError:
                             logging.info("Market is empty!")
@@ -413,10 +438,9 @@ def two_way_probe():
 
 coin_pairs = find_market_pairs()
 
-# three_way_probe()
-
 two_way_probe()
 
-# while True:
-#     print fetch_fiat("BTC")
-#     print fetch_fiat("LTC")
+
+
+
+
