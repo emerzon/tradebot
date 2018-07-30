@@ -37,7 +37,7 @@ while True:
     print refresh_fiat_values_loop
 
     for coin in coins:
-        #print '[%s]' % coin,
+        print '[%s]' % coin,
         temp = requests.get(
             "https://www.cryptopia.co.nz/api/GetMarketOrderGroups/%s_BTC-%s_LTC/1" % (coin, coin)).json()
         try:
@@ -59,12 +59,10 @@ while True:
             ltc_buy_order_size = 0
             ltc_sell_order_size = 0
 
-        # ltc_temp = requests.get("https://www.cryptopia.co.nz/api/GetMarketOrders/%s_LTC/1" % coin).json()
+        ltc_temp = requests.get("https://www.cryptopia.co.nz/api/GetMarketOrders/%s_LTC/1" % coin).json()
 
-        # print "%s - BTC B%s - S%s (~%s)" % (coin, coin_btc_buy[coin] * btc_value, coin_btc_sell[coin] * btc_value
-        #                                             coin_btc_sell[coin] / coin_btc_buy[coin] * 100 - 100)
-        # print "%s - LTC B%s - S%s (~%s)" % (coin, coin_ltc_buy[coin] * ltc_value, coin_ltc_sell[coin] * ltc_value,
-        # coin_ltc_sell[coin] / coin_ltc_buy[coin] * 100 - 100)
+        print "%s - BTC B%s - S%s (~%s)" % (coin, coin_btc_buy[coin] * btc_value, coin_btc_sell[coin] * btc_value, coin_btc_sell[coin] / coin_btc_buy[coin] * 100 - 100)
+        print "%s - LTC B%s - S%s (~%s)" % (coin, coin_ltc_buy[coin] * ltc_value, coin_ltc_sell[coin] * ltc_value, coin_ltc_sell[coin] / coin_ltc_buy[coin] * 100 - 100)
 
         if coin_btc_sell[coin] * 1.002 * btc_value < coin_ltc_buy[coin] * 0.998 * ltc_value:
             order_size = float(min(btc_sell_order_size, ltc_buy_order_size))

@@ -127,7 +127,7 @@ class Api(object):
     def submit_trade(self, market, trade_type, rate, amount):
         """ Submits a trade """
         return self.api_query(feature_requested='SubmitTrade',
-                              post_parameters={'Market': market,
+                              post_parameters={'TradePairId': market,
                                                'Type': trade_type,
                                                'Rate': rate,
                                                'Amount': amount})
