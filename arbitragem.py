@@ -1,6 +1,7 @@
 # Imports
 import requests
 import datetime
+import time
 from decimal import *
 
 # Opcoes
@@ -63,37 +64,51 @@ def get_values(exchange, market):
     elif exchange == "Cryptopia":
         param = market.split("-")[1] + "_" + market.split("-")[0]
         tmp_value = s.get("https://www.cryptopia.co.nz/api/GetMarketOrderGroups/%s/1" % param).json()
-        return ({"Sell": str(tmp_value['Data'][0]['Sell'][0]['Price']),
-                 "Buy": str(tmp_value['Data'][0]['Buy'][0]['Price'])})
+        if len(tmp_value) > 0:
+            return ({"Sell": str(tmp_value['Data'][0]['Sell'][0]['Price']),
+                     "Buy": str(tmp_value['Data'][0]['Buy'][0]['Price'])})
+        else:
+            return None
 
 
 init_markets()
 
-for xc1 in exchanges:
-    for xc2 in exchanges:
-        if xc1 != xc2 and xc1 < xc2:
-            print "Comparing %s with %s" % (xc1, xc2)
-            common_mkt = list(set(exchanges[xc1]).intersection(exchanges[xc2]))
-            for mkt in common_mkt:
-                xc1_offer = get_values(xc1, mkt)
-                xc1_buy = float(xc1_offer["Buy"])
-                xc1_sell = float(xc1_offer["Sell"])
-                xc2_offer = get_values(xc2, mkt)
-                xc2_buy = float(xc2_offer["Buy"])
-                xc2_sell = float(xc2_offer["Sell"])
+while True:
 
-                if xc2_sell < xc1_buy:
-                    print "=== [ %s %.2f%% ] === Buy in %s for %.8f and sell in %s for %.8f!" % (
-                    mkt, (xc1_buy / xc2_sell * 100 - 100), xc2, xc2_sell, xc1, xc1_buy)
+    for xc1 in exchanges:
+        for xc2 in exchanges:
+            if xc1 != xc2 and xc1 < xc2:
+                # print "Comparing %s with %s" % (xc1, xc2)
+                common_mkt = list(set(exchanges[xc1]).intersection(exchanges[xc2]))
+                for mkt in common_mkt:
+                    try:
+                        xc1_offer = get_values(xc1, mkt)
+                        xc1_buy = float(xc1_offer["Buy"])
+                        xc1_sell = float(xc1_offer["Sell"])
+                        xc2_offer = get_values(xc2, mkt)
+                        xc2_buy = float(xc2_offer["Buy"])
+                        xc2_sell = float(xc2_offer["Sell"])
 
-                if xc1_sell < xc1_buy:
-                    print "=== [ %s %.2f%% ] === Buy in %s for %.8f and sell in %s for %.8f!" % (
-                    mkt, (xc2_buy / xc1_sell * 100 - 100), xc1, xc1_sell, xc2, xc2_buy)
+                        if xc2_sell < xc1_buy:
+                            print "=== %s [ %s %.2f%% ] === Buy in %s for %.8f and sell in %s for %.8f!" % (
+                                time.strftime("%Y-%m-%d %H:%M"), mkt, (xc1_buy / xc2_sell * 100 - 100), xc2, xc2_sell,
+                                xc1, xc1_buy)
 
-                if xc2_sell < xc1_buy or xc1_sell < xc1_buy:
-                    print " %s: " % xc1
-                    print "  (-) : %.8f - US$ %.8f" % (xc1_buy, xc1_buy * fetch_fiat(mkt.split("-")[0]))
-                    print "  (+) : %.8f - US$ %.8f" % (xc1_sell, xc1_sell * fetch_fiat(mkt.split("-")[0]))
-                    print " %s: " % xc2
-                    print "  (-) : %.8f - US$ %.8f" % (xc2_buy, xc2_buy * fetch_fiat(mkt.split("-")[0]))
-                    print "  (+) : %.8f - US$ %.8f" % (xc2_sell, xc2_sell * fetch_fiat(mkt.split("-")[0]))
+                        if xc1_sell < xc2_buy:
+                            print "=== %s [ %s %.2f%% ] === Buy in %s for %.8f and sell in %s for %.8f!" % (
+                                time.strftime("%Y-%m-%d %H:%M"), mkt, (xc2_buy / xc1_sell * 100 - 100), xc1, xc1_sell,
+                                xc2, xc2_buy)
+
+                    except:
+                        pass
+                    # if xc2_sell <= xc1_buy or xc1_sell <= xc2_buy:
+                    #     print mkt
+                    #     print " %s: " % xc1
+                    #     print "  (-) : %.8f - US$ %.8f" % (xc1_buy, xc1_buy * fetch_fiat(mkt.split("-")[0]))
+                    #     print "  (+) : %.8f - US$ %.8f" % (xc1_sell, xc1_sell * fetch_fiat(mkt.split("-")[0]))
+                    #     print " %s: " % xc2
+                    #     print "  (-) : %.8f - US$ %.8f" % (xc2_buy, xc2_buy * fetch_fiat(mkt.split("-")[0]))
+                    #     print "  (+) : %.8f - US$ %.8f" % (xc2_sell, xc2_sell * fetch_fiat(mkt.split("-")[0]))
+
+    print "------------------------------------------------------------------"
+    time.sleep(30)

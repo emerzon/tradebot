@@ -132,7 +132,7 @@ def assemble_order_quotation(initial_quantity, *pairs):
                     actual_quantity = Decimal(quantity).normalize()
                 suborder = assemble_suborder(coin1, coin2, actual_quantity, orders)
 
-                if len(suborder) == 0:
+                if suborder is None or len(suborder) == 0:
                     raise OverflowError('Empty market!')
 
                 suborder_price = Decimal(sum(Decimal(row[2]) for row in suborder)).normalize()
@@ -345,7 +345,7 @@ def do_trade(orders):
     return True
 
 def three_way_probe():
-    allowed_initial_markets = ["BTC", "LTC", "DOGE", "USDT", "NZDT"]
+    allowed_initial_markets = ["BTC", "LTC"]
 
     while True:
         for coin, markets in coin_pairs.iteritems():
@@ -408,8 +408,8 @@ def three_way_probe():
 
 
 def two_way_probe():
-    allowed_markets = ["USDT", "DOGE", "LTC"]
-    allowed_initial_markets = ["USDT"]
+    allowed_markets = ["BTC", "DOGE", "LTC"]
+    allowed_initial_markets = ["BTC"]
 
 
     while True:
