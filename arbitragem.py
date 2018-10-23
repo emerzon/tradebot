@@ -9,31 +9,22 @@ fiat_ttl = 60
 
 # Variable init
 s = requests.Session()
-fiat_values = {}
-fiat_last_check = {}
+
 exchanges = {}
+cache_bucket = {}
 
 
 def fetch_fiat(coin):
-    global fiat_values
-    global fiat_last_check
     if coin in ["BTC", "LTC", "DOGE"]:
-        last_check = fiat_last_check.get(coin, datetime.datetime(1970, 1, 1))
-        if (datetime.datetime.now() - last_check).total_seconds() > fiat_ttl:
             if coin in ["BTC", "LTC"]:
-                value = float(requests.get("https://api.coinbase.com/v2/prices/%s-USD/sell" % coin).json()['data'][
-                                  'amount'])
+                value = float(dlc("https://api.coinbase.com/v2/prices/%s-USD/sell" % coin, 60)['data']['amount'])
             else:
-                value = float(
-                    requests.get("https://api.cryptowat.ch/markets/kraken/dogebtc/summary").json()['result']['price'][
-                        'last']) * fetch_fiat("BTC")
-            fiat_values[coin] = value
-            fiat_last_check[coin] = datetime.datetime.now()
-        return fiat_values[coin]
+                value = float(dlc("https://api.cryptowat.ch/markets/kraken/dogebtc/summary", 60)['result']['price']['last']) * fetch_fiat("BTC")
     elif coin in ["USDT"]:
-        return float(0.999)
+        value = float(0.999)
     else:
-        return 0
+        value = 0
+    return value
 
 
 def init_markets():
@@ -64,12 +55,12 @@ def init_markets():
 
 def get_values(exchange, market):
     if exchange == "TradeOgre":
-        tmp_value = s.get("https://tradeogre.com/api/v1/ticker/%s" % market).json()
+        tmp_value = dlc("https://tradeogre.com/api/v1/ticker/%s" % market, 60)
         return ({"Sell": str(tmp_value["ask"]),
                  "Buy": str(tmp_value["bid"])})
     elif exchange == "Cryptopia":
         param = market.split("-")[1] + "_" + market.split("-")[0]
-        tmp_value = s.get("https://www.cryptopia.co.nz/api/GetMarketOrderGroups/%s/1" % param).json()
+        tmp_value = dlc("https://www.cryptopia.co.nz/api/GetMarketOrderGroups/%s/1" % param, 60)
         if len(tmp_value) > 0:
             return ({"Sell": str(tmp_value['Data'][0]['Sell'][0]['Price']),
                      "Buy": str(tmp_value['Data'][0]['Buy'][0]['Price'])})
@@ -77,12 +68,17 @@ def get_values(exchange, market):
             return None
     elif exchange == "Poloniex":
         param = market.split("-")[0] + "_" + market.split("-")[1]
-        tmp_value = s.get("https://poloniex.com/public?command=returnTicker").json()
+        tmp_value = dlc("https://poloniex.com/public?command=returnTicker", 60)
         return ({"Sell": str(tmp_value[param]["lowestAsk"]),
                  "Buy": str(tmp_value[param]["highestBid"])})
 
 
-
+def dlc(url, timeout):
+    global cache_bucket
+    last_check = cache_bucket[url]["ts"].get(url, datetime.datetime(1970, 1, 1))
+    if (datetime.datetime.now() - last_check).total_seconds() < timeout:
+            cache_bucket[url]["data"] = s.get(url).json()
+    return cache_bucket[url]["data"]
 
 
 init_markets()
