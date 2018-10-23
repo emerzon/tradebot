@@ -43,6 +43,7 @@ def init_markets():
     # TradeOgre
     TradeOgre_markets = s.get("https://tradeogre.com/api/v1/markets").json()
     Cryptopia_markets = s.get("https://www.cryptopia.co.nz/api/GetTradePairs", stream=False).json()["Data"]
+    Poloniex_markets = s.get("https://poloniex.com/public?command=returnTicker").json()
 
     for market in TradeOgre_markets:
         for k, v in market.iteritems():
@@ -54,6 +55,11 @@ def init_markets():
         if market["Status"] == "OK":
             lista.append("%s-%s" % (market["BaseSymbol"], market["Symbol"]))
         exchanges["Cryptopia"] = lista
+
+    lista = []
+    for market in Poloniex_markets:
+        lista.append("%s-%s" % (market.split("_")[0], market.split("_")[1]))
+        exchanges["Poloniex"] = lista
 
 
 def get_values(exchange, market):
@@ -69,6 +75,14 @@ def get_values(exchange, market):
                      "Buy": str(tmp_value['Data'][0]['Buy'][0]['Price'])})
         else:
             return None
+    elif exchange == "Poloniex":
+        param = market.split("-")[0] + "_" + market.split("1")[0]
+        tmp_value = s.get("https://poloniex.com/public?command=returnTicker")
+        return ({"Sell": str(tmp_value[param]["lowestAsk"]),
+                 "Buy": str(tmp_value[param]["highestBid"])})
+
+
+
 
 
 init_markets()
@@ -78,9 +92,11 @@ while True:
     for xc1 in exchanges:
         for xc2 in exchanges:
             if xc1 != xc2 and xc1 < xc2:
-                # print "Comparing %s with %s" % (xc1, xc2)
+                print "Comparing %s with %s" % (xc1, xc2)
                 common_mkt = list(set(exchanges[xc1]).intersection(exchanges[xc2]))
+                print "...%s common markets" % len(common_mkt)
                 for mkt in common_mkt:
+                    print "Probing %s" % mkt
                     try:
                         xc1_offer = get_values(xc1, mkt)
                         xc1_buy = float(xc1_offer["Buy"])
